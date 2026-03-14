@@ -90,15 +90,12 @@ The `web/` app is the real Next.js DApp with wallet actions and contract calls. 
 | Wallet | MetaMask / injected wallet |
 | Storage | IPFS via Pinata, on-chain CID references |
 | Testing | Hardhat test runner + Chai |
-| GitHub Demo | Static HTML/CSS/JS in `docs/` + GitHub Pages workflow |
+| GitHub Demo | Static HTML/CSS/JS in `docs/`, published from `main/docs` |
 
 ## Project Structure
 
 ```text
 milestone-vault/
-|-- .github/
-|   |-- workflows/
-|       |-- deploy-pages.yml
 |-- contracts/
 |   |-- contracts/
 |   |   |-- MilestoneVault.sol
@@ -231,7 +228,7 @@ The UML document includes:
 
 ## Git Delivery
 
-This repository is configured for `main` and GitHub Pages deployment through GitHub Actions.
+This repository is configured for `main`, and the GitHub Pages site is published directly from the `docs/` folder on `main`.
 
 ```bash
 git remote add origin https://github.com/gengyuzhu/FT5004-Group-66-Project.git
