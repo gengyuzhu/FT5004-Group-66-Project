@@ -9,6 +9,10 @@ export function getIpfsUrl(cidOrUrl?: string | null) {
     return cidOrUrl;
   }
 
+  if (cidOrUrl.startsWith("/")) {
+    return cidOrUrl;
+  }
+
   return `${ipfsGatewayBase}/${cidOrUrl}`;
 }
 

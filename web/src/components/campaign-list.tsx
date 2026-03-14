@@ -14,8 +14,12 @@ import {
 
 type CampaignListProps = {
   campaigns: CampaignViewModel[];
+  currentPage: number;
   isLoading: boolean;
   error: string | null;
+  totalItems: number;
+  totalPages: number;
+  onPageChange: (value: number) => void;
   searchTerm: string;
   statusFilter: string;
   onSearchChange: (value: string) => void;
@@ -30,8 +34,12 @@ function getFilterLabel(filter: string) {
 
 export function CampaignList({
   campaigns,
+  currentPage,
   isLoading,
   error,
+  totalItems,
+  totalPages,
+  onPageChange,
   searchTerm,
   statusFilter,
   onSearchChange,
@@ -139,6 +147,36 @@ export function CampaignList({
           );
         })}
       </div>
+
+      {totalItems > 0 ? (
+        <div className="pagination-row">
+          <div className="pagination-copy">
+            <span className="field-label">Results</span>
+            <strong>
+              Page {currentPage} of {totalPages} | {totalItems} campaigns
+            </strong>
+          </div>
+
+          <div className="pagination-actions">
+            <button
+              className="button button-ghost button-small"
+              disabled={currentPage <= 1}
+              onClick={() => onPageChange(currentPage - 1)}
+              type="button"
+            >
+              Previous
+            </button>
+            <button
+              className="button button-ghost button-small"
+              disabled={currentPage >= totalPages}
+              onClick={() => onPageChange(currentPage + 1)}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -89,7 +89,7 @@ The `web/` app is the real Next.js DApp with wallet actions and contract calls. 
 | Web3 Client | wagmi 3.x + viem 2.x |
 | Wallet | MetaMask / injected wallet |
 | Storage | IPFS via Pinata, on-chain CID references |
-| Testing | Hardhat test runner + Chai |
+| Testing | Hardhat + Chai + Playwright E2E |
 | GitHub Demo | Static HTML/CSS/JS in `docs/`, published from `main/docs` |
 
 ## Project Structure
@@ -119,8 +119,13 @@ milestone-vault/
 |   |-- limitations.md
 |   |-- uml.md
 |-- web/
+|   |-- e2e/
+|   |   |-- api-validation.spec.ts
+|   |   |-- campaign-create.spec.ts
+|   |   |-- proof-submission.spec.ts
 |   |-- src/
 |   |   |-- app/
+|   |   |   |-- api/mock-ipfs/[assetId]/route.ts
 |   |   |-- components/
 |   |   |   |-- dashboard-shell.tsx
 |   |   |   |-- campaign-detail-client.tsx
@@ -128,7 +133,10 @@ milestone-vault/
 |   |   |   |-- app-topbar.tsx
 |   |   |   |-- wallet-toolbar.tsx
 |   |   |-- lib/
+|   |   |   |-- validation.ts
 |   |-- package.json
+|   |-- playwright.config.ts
+|   |-- scripts/e2e-dev-server.mjs
 |-- .gitignore
 |-- LICENSE
 |-- README.md
@@ -168,16 +176,35 @@ Verified locally with:
 cd contracts && npm test
 cd web && npm run lint
 cd web && npm run build
+cd web && npm run e2e
 ```
+
+## Frontend E2E Coverage
+
+Playwright now covers the real browser flow against a local Hardhat deployment:
+
+- wallet-backed campaign creation through the actual UI
+- proof submission from the detail action rail
+- invalid campaign metadata rejected by the IPFS upload route
+- invalid proof payloads rejected by the proof upload route
+
+The E2E harness starts:
+
+- a local Hardhat node
+- a fresh localhost deployment export
+- the Next.js app in `PINATA_E2E_MODE=mock`
+
+This keeps the tests deterministic while still exercising wallet signing, contract writes, multipart upload routes, and CID-like asset retrieval through `/api/mock-ipfs/[assetId]`.
 
 ## What The Frontend Covers
 
 - Wallet connect and network switch
 - Campaign creation with milestone drafting and client-side schedule validation
-- Campaign discovery dashboard with search, status filters, and a compact product-style topbar
+- Campaign discovery dashboard with search, status filters, lightweight pagination, and a compact product-style topbar
 - Campaign detail page with overview, milestones, and activity tabs
 - Contribution, proof, vote, execute, withdraw, and refund actions from a persistent action rail
 - IPFS upload routes for campaign metadata and milestone proof bundles
+- Strict schema validation for campaign metadata and proof payloads before upload
 - Responsive layouts tuned for desktop and mobile widths
 - Static GitHub Pages interaction demo with the same design language as the real DApp
 
@@ -185,7 +212,7 @@ cd web && npm run build
 
 - The main DApp now follows a darker, denser product layout inspired by the reference `App.jsx`, with smaller typography, clearer hierarchy, and less clutter in the header.
 - Dashboard, creator flow, campaign detail, and the repository demo now share the same brand system, card language, and mobile-first responsive behavior.
-- The GitHub Pages site intentionally avoids extra top-right document links; supporting docs remain available lower in the page and in the repository.
+- The GitHub Pages site intentionally avoids extra top-right document links; supporting docs remain available lower in the page and in the repository, while search, filtering, and toast feedback keep the static preview feeling interactive.
 
 ## Local Setup
 
@@ -205,6 +232,17 @@ cd web && npm run build
    - `cd web`
    - `npm run dev`
 6. Open `http://localhost:3000`
+
+## Local E2E Run
+
+1. Install Playwright once:
+   - `cd web`
+   - `npm run e2e:install`
+2. Run the browser suite:
+   - `cd web`
+   - `npm run e2e`
+
+The E2E script starts the local chain, deploys the contract, boots the frontend, and uses a deterministic injected wallet plus mock IPFS transport for reproducible testing.
 
 ## Sepolia Deployment
 

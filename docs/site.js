@@ -2,6 +2,7 @@ const state = {
   walletConnected: false,
   network: "Localhost",
   filter: "All",
+  search: "",
   selectedCampaignId: 2,
   activity: [
     "Preview booted from the repository site.",
@@ -72,6 +73,10 @@ const walletToggle = document.getElementById("wallet-toggle");
 const walletState = document.getElementById("wallet-state");
 const networkSwitcher = document.getElementById("network-switcher");
 const filterSwitcher = document.getElementById("filter-switcher");
+const searchInput = document.getElementById("search-input");
+const toast = document.getElementById("toast");
+
+let toastTimer;
 
 function getStatusClass(status) {
   switch (status) {
@@ -91,6 +96,19 @@ function getStatusClass(status) {
 function appendActivity(message) {
   state.activity.unshift(message);
   state.activity = state.activity.slice(0, 8);
+}
+
+function showToast(message) {
+  if (!toast) {
+    return;
+  }
+
+  toast.textContent = message;
+  toast.classList.add("toast-active");
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toast.classList.remove("toast-active");
+  }, 2200);
 }
 
 function selectedCampaign() {
@@ -119,7 +137,9 @@ function renderSwitchers() {
 
 function renderCampaigns() {
   const filtered = campaigns.filter(
-    (campaign) => state.filter === "All" || campaign.status === state.filter,
+    (campaign) =>
+      (state.filter === "All" || campaign.status === state.filter) &&
+      `${campaign.title} ${campaign.summary}`.toLowerCase().includes(state.search.toLowerCase()),
   );
 
   campaignGrid.innerHTML = filtered
@@ -320,6 +340,7 @@ function handleAction(action) {
       campaign.raised = Math.min(campaign.goal, Number((campaign.raised + 0.5).toFixed(1)));
       campaign.refundPool = campaign.raised;
       appendActivity(`Backer contributed 0.5 ETH to campaign ${campaign.id}.`);
+      showToast("Added a simulated contribution.");
       break;
     case "finalize":
       campaign.status = campaign.raised >= campaign.goal ? "Active" : "Failed";
@@ -328,23 +349,27 @@ function handleAction(action) {
           ? `Campaign ${campaign.id} finalized and entered milestone execution.`
           : `Campaign ${campaign.id} missed its goal and opened refunds.`,
       );
+      showToast(campaign.status === "Active" ? "Campaign moved to Active." : "Campaign moved to Failed.");
       break;
     case "submit-proof":
       if (currentMilestone) {
         currentMilestone.proof = true;
         appendActivity(`Creator submitted proof for milestone ${campaign.currentMilestone + 1}.`);
+        showToast("Proof submitted and voting opened.");
       }
       break;
     case "vote-yes":
       if (currentMilestone) {
         currentMilestone.yes = Number((currentMilestone.yes + 1.5).toFixed(1));
         appendActivity(`A backer cast a YES vote on milestone ${campaign.currentMilestone + 1}.`);
+        showToast("YES vote recorded.");
       }
       break;
     case "vote-no":
       if (currentMilestone) {
         currentMilestone.no = Number((currentMilestone.no + 1).toFixed(1));
         appendActivity(`A backer cast a NO vote on milestone ${campaign.currentMilestone + 1}.`);
+        showToast("NO vote recorded.");
       }
       break;
     case "execute":
@@ -358,18 +383,22 @@ function handleAction(action) {
           campaign.currentMilestone += 1;
           campaign.status = campaign.currentMilestone >= campaign.milestones.length ? "Completed" : "Active";
           appendActivity(`Milestone execution passed for campaign ${campaign.id}.`);
+          showToast("Milestone execution passed.");
         } else {
           campaign.status = "Failed";
           appendActivity(`Milestone execution failed and refunds opened for campaign ${campaign.id}.`);
+          showToast("Milestone execution failed.");
         }
       }
       break;
     case "miss-deadline":
       campaign.status = "Failed";
       appendActivity(`Campaign ${campaign.id} failed after the active milestone deadline was missed.`);
+      showToast("Campaign failed for a missed deadline.");
       break;
     case "claim-refund":
       appendActivity(`Backer claimed a proportional refund from campaign ${campaign.id}.`);
+      showToast("Refund claimed in preview mode.");
       break;
     default:
       break;
@@ -382,6 +411,9 @@ function render() {
   walletState.textContent = state.walletConnected ? `Wallet connected on ${state.network}` : "Wallet offline";
   walletState.className = `status-pill ${state.walletConnected ? "status-active" : "status-default"}`;
   walletToggle.textContent = state.walletConnected ? "Disconnect Wallet" : "Connect Wallet";
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.value = state.search;
+  }
 
   renderSwitchers();
   renderCampaigns();
@@ -393,6 +425,17 @@ walletToggle.addEventListener("click", () => {
   appendActivity(
     state.walletConnected ? "Mock wallet connected in the repository preview." : "Mock wallet disconnected.",
   );
+  showToast(state.walletConnected ? "Wallet connected in preview mode." : "Wallet disconnected.");
+  render();
+});
+
+searchInput?.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  state.search = target.value.trim();
   render();
 });
 
@@ -405,6 +448,7 @@ document.addEventListener("click", (event) => {
   const campaignCard = target.closest("[data-campaign-id]");
   if (campaignCard instanceof HTMLElement) {
     state.selectedCampaignId = Number(campaignCard.dataset.campaignId);
+    showToast(`Previewing campaign #${state.selectedCampaignId}.`);
     render();
     return;
   }
@@ -412,12 +456,14 @@ document.addEventListener("click", (event) => {
   if (target.dataset.network) {
     state.network = target.dataset.network;
     appendActivity(`Preview network switched to ${state.network}.`);
+    showToast(`Network switched to ${state.network}.`);
     render();
     return;
   }
 
   if (target.dataset.filter) {
     state.filter = target.dataset.filter;
+    showToast(`Filter set to ${state.filter}.`);
     render();
     return;
   }

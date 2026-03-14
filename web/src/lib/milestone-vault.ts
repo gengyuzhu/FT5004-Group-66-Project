@@ -117,15 +117,26 @@ export async function fetchCampaign(
   const milestoneIds = Array.from({ length: Number(campaign.milestoneCount) }, (_, index) => BigInt(index));
 
   const milestoneContracts = milestoneIds.length
-    ? await publicClient.multicall({
-        contracts: milestoneIds.map((milestoneId) => ({
-          address: contractAddress,
-          abi: milestoneVaultAbi,
-          functionName: "getMilestone",
-          args: [campaignId, milestoneId],
-        })),
-        allowFailure: false,
-      })
+    ? publicClient.chain?.contracts?.multicall3
+      ? await publicClient.multicall({
+          contracts: milestoneIds.map((milestoneId) => ({
+            address: contractAddress,
+            abi: milestoneVaultAbi,
+            functionName: "getMilestone",
+            args: [campaignId, milestoneId],
+          })),
+          allowFailure: false,
+        })
+      : await Promise.all(
+          milestoneIds.map((milestoneId) =>
+            publicClient.readContract({
+              address: contractAddress,
+              abi: milestoneVaultAbi,
+              functionName: "getMilestone",
+              args: [campaignId, milestoneId],
+            }),
+          ),
+        )
     : [];
 
   const milestones = await Promise.all(

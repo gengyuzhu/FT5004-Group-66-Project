@@ -387,6 +387,7 @@ img {
 .detail-hero-head,
 .campaign-card-topline,
 .campaign-card-footer,
+.pagination-row,
 .surface-header,
 .form-header,
 .form-header-actions,
@@ -419,7 +420,8 @@ img {
 .info-card strong,
 .wallet-mini-card strong,
 .mini-card strong,
-.summary-chip strong {
+.summary-chip strong,
+.pagination-copy strong {
   display: block;
   margin-top: 8px;
   font-size: 1.15rem;
@@ -511,6 +513,13 @@ img {
   color: #f8faff;
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .button:disabled {
@@ -1005,6 +1014,7 @@ input[type="file"] {
   .form-header,
   .form-header-actions,
   .wallet-panel-header,
+  .pagination-row,
   .subsection-header,
   .milestone-editor-header,
   .detail-section-header,

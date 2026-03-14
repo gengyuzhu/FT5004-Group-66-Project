@@ -17,6 +17,7 @@ const browseHighlights = [
   "Creators submit proof to IPFS while the contract stores only the content identifier.",
   "Backers approve or reject each active milestone with contribution-weighted voting power.",
 ];
+const pageSize = 6;
 
 export function DashboardShell() {
   const activeChainId = useChainId();
@@ -27,6 +28,7 @@ export function DashboardShell() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [surface, setSurface] = useState<"browse" | "create">("browse");
   const deferredSearch = useDeferredValue(searchTerm);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -102,10 +104,26 @@ export function DashboardShell() {
 
     return matchesSearch && matchesStatus;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedCampaigns = filteredCampaigns.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const totalRaised = campaigns.reduce((sum, campaign) => sum + campaign.contract.totalRaised, 0n);
   const activeCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 2).length;
   const fundraisingCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 0).length;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <main className="dashboard-shell">
@@ -166,13 +184,17 @@ export function DashboardShell() {
         <div className="dashboard-grid dashboard-grid-browse">
           <section className="main-stage">
             <CampaignList
-              campaigns={filteredCampaigns}
+              campaigns={paginatedCampaigns}
+              currentPage={currentPage}
               error={error}
               isLoading={isLoading}
+              onPageChange={setPage}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
+              totalItems={filteredCampaigns.length}
+              totalPages={totalPages}
             />
           </section>
 

@@ -1,61 +1,58 @@
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
 
 import { uploadFileToPinata, uploadJsonToPinata } from "@/lib/server/pinata";
+import { isMockIpfsEnabled, uploadFileToMockIpfs, uploadJsonToMockIpfs } from "@/lib/server/mock-ipfs";
+import {
+  campaignMetadataUploadSchema,
+  formatValidationError,
+  validateOptionalCoverImage,
+} from "@/lib/validation";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const title = String(formData.get("title") ?? "").trim();
-    const summary = String(formData.get("summary") ?? "").trim();
-    const description = String(formData.get("description") ?? "").trim();
-    const goal = String(formData.get("goal") ?? "").trim();
-    const fundraisingDeadline = String(formData.get("fundraisingDeadline") ?? "").trim();
-    const milestonesRaw = String(formData.get("milestones") ?? "[]");
-    const externalLinksRaw = String(formData.get("externalLinks") ?? "[]");
-
-    if (!title || !summary || !description || !goal || !fundraisingDeadline) {
-      return NextResponse.json(
-        {
-          error: "Title, summary, description, goal, and fundraising deadline are required.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const milestones = JSON.parse(milestonesRaw) as unknown[];
-    const externalLinks = JSON.parse(externalLinksRaw) as string[];
-
-    if (!Array.isArray(milestones) || !milestones.length) {
-      return NextResponse.json(
-        {
-          error: "At least one milestone is required in the metadata bundle.",
-        },
-        { status: 400 },
-      );
-    }
+    const rawMilestones = JSON.parse(String(formData.get("milestones") ?? "[]")) as unknown;
+    const rawExternalLinks = JSON.parse(String(formData.get("externalLinks") ?? "[]")) as unknown;
+    const parsedPayload = campaignMetadataUploadSchema.parse({
+      title: String(formData.get("title") ?? ""),
+      summary: String(formData.get("summary") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      goal: String(formData.get("goal") ?? ""),
+      fundraisingDeadline: String(formData.get("fundraisingDeadline") ?? ""),
+      milestones: rawMilestones,
+      externalLinks: rawExternalLinks,
+    });
 
     const coverImage = formData.get("coverImage");
     let coverImageCid: string | undefined;
+    const maybeCoverImage = coverImage instanceof File ? coverImage : null;
 
-    if (coverImage instanceof File && coverImage.size > 0) {
-      coverImageCid = await uploadFileToPinata(coverImage);
+    validateOptionalCoverImage(maybeCoverImage);
+
+    if (maybeCoverImage && maybeCoverImage.size > 0) {
+      coverImageCid = isMockIpfsEnabled()
+        ? await uploadFileToMockIpfs(maybeCoverImage)
+        : await uploadFileToPinata(maybeCoverImage);
     }
 
     const metadata = {
-      title,
-      summary,
-      description,
+      title: parsedPayload.title,
+      summary: parsedPayload.summary,
+      description: parsedPayload.description,
       coverImageCid,
-      milestones,
-      externalLinks,
+      milestones: parsedPayload.milestones,
+      externalLinks: parsedPayload.externalLinks,
       createdAt: new Date().toISOString(),
-      goal,
-      fundraisingDeadline,
+      goal: parsedPayload.goal,
+      fundraisingDeadline: parsedPayload.fundraisingDeadline,
     };
 
-    const cid = await uploadJsonToPinata(`milestonevault-campaign-${Date.now()}`, metadata);
+    const cid = isMockIpfsEnabled()
+      ? await uploadJsonToMockIpfs(`milestonevault-campaign-${Date.now()}`, metadata)
+      : await uploadJsonToPinata(`milestonevault-campaign-${Date.now()}`, metadata);
 
     return NextResponse.json({
       cid,
@@ -63,6 +60,24 @@ export async function POST(request: Request) {
       metadata,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        {
+          error: formatValidationError(error),
+        },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        {
+          error: "Campaign metadata fields must be valid JSON payloads.",
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unable to upload campaign metadata.",

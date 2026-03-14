@@ -19,6 +19,7 @@
   <body>
     <div class="ambient ambient-one"></div>
     <div class="ambient ambient-two"></div>
+    <div class="toast" id="toast" aria-live="polite"></div>
 
     <main class="page-shell">
       <header class="site-header">
@@ -75,6 +76,10 @@
 
       <section class="workspace" id="workspace">
         <div class="workspace-toolbar">
+          <div class="toolbar-block">
+            <span class="eyebrow">Search</span>
+            <input id="search-input" placeholder="Search title or summary" type="text" />
+          </div>
           <div class="toolbar-block">
             <span class="eyebrow">Filter</span>
             <div class="chip-row" id="filter-switcher"></div>

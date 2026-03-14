@@ -1,33 +1,31 @@
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
 
 import { uploadFileToPinata, uploadJsonToPinata } from "@/lib/server/pinata";
+import { isMockIpfsEnabled, uploadFileToMockIpfs, uploadJsonToMockIpfs } from "@/lib/server/mock-ipfs";
+import { formatValidationError, proofUploadSchema, validateProofFiles } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const campaignId = Number(formData.get("campaignId"));
-    const milestoneId = Number(formData.get("milestoneId"));
-    const summary = String(formData.get("summary") ?? "").trim();
-    const demoLinksRaw = String(formData.get("demoLinks") ?? "[]");
-    const demoLinks = JSON.parse(demoLinksRaw) as string[];
+    const parsedPayload = proofUploadSchema.parse({
+      campaignId: Number(formData.get("campaignId")),
+      milestoneId: Number(formData.get("milestoneId")),
+      summary: String(formData.get("summary") ?? ""),
+      demoLinks: JSON.parse(String(formData.get("demoLinks") ?? "[]")) as unknown,
+    });
     const fileEntries = formData
       .getAll("files")
       .filter((entry): entry is File => entry instanceof File && entry.size > 0);
-
-    if (!Number.isFinite(campaignId) || !Number.isFinite(milestoneId) || !summary) {
-      return NextResponse.json(
-        {
-          error: "Campaign id, milestone id, and proof summary are required.",
-        },
-        { status: 400 },
-      );
-    }
+    validateProofFiles(fileEntries);
 
     const uploadedFiles = [];
     for (const file of fileEntries) {
-      const cid = await uploadFileToPinata(file);
+      const cid = isMockIpfsEnabled()
+        ? await uploadFileToMockIpfs(file)
+        : await uploadFileToPinata(file);
       uploadedFiles.push({
         name: file.name,
         cid,
@@ -37,24 +35,47 @@ export async function POST(request: Request) {
     }
 
     const proof = {
-      campaignId,
-      milestoneId,
-      summary,
+      campaignId: parsedPayload.campaignId,
+      milestoneId: parsedPayload.milestoneId,
+      summary: parsedPayload.summary,
       fileCids: uploadedFiles,
-      demoLinks,
+      demoLinks: parsedPayload.demoLinks,
       submittedAt: new Date().toISOString(),
     };
 
-    const cid = await uploadJsonToPinata(
-      `milestonevault-proof-${campaignId}-${milestoneId}-${Date.now()}`,
-      proof,
-    );
+    const cid = isMockIpfsEnabled()
+      ? await uploadJsonToMockIpfs(
+          `milestonevault-proof-${parsedPayload.campaignId}-${parsedPayload.milestoneId}-${Date.now()}`,
+          proof,
+        )
+      : await uploadJsonToPinata(
+          `milestonevault-proof-${parsedPayload.campaignId}-${parsedPayload.milestoneId}-${Date.now()}`,
+          proof,
+        );
 
     return NextResponse.json({
       cid,
       proof,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        {
+          error: formatValidationError(error),
+        },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        {
+          error: "Proof payload links must be valid JSON arrays.",
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unable to upload proof bundle.",

@@ -79,6 +79,30 @@ code,
   padding: 22px 0 42px;
 }
 
+.toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  z-index: 30;
+  min-width: 220px;
+  max-width: min(92vw, 420px);
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(17, 29, 46, 0.94);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast-active {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .site-header,
 .workspace-toolbar,
 .hero,
@@ -281,7 +305,7 @@ code,
 }
 
 .workspace-toolbar {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 18px;
   padding: 18px 20px;
   border-radius: 24px;
@@ -296,6 +320,20 @@ code,
 
 .toolbar-note p {
   margin: 0;
+}
+
+.workspace-toolbar input {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(3, 7, 18, 0.42);
+  color: var(--ink);
+  outline: none;
+}
+
+.workspace-toolbar input::placeholder {
+  color: #718198;
 }
 
 .chip {
