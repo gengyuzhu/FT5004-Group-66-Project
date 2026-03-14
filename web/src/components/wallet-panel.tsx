@@ -31,6 +31,17 @@ export function WalletPanel() {
         </div>
       </div>
 
+      <div className="network-guide">
+        <article className="network-guide-card">
+          <span className="field-label">Localhost</span>
+          <p className="muted-text">Best for demo speed, local testing, and full-end-to-end rehearsal.</p>
+        </article>
+        <article className="network-guide-card">
+          <span className="field-label">Sepolia</span>
+          <p className="muted-text">Best for public verification with a real testnet wallet flow.</p>
+        </article>
+      </div>
+
       <div className="wallet-actions">
         {isConnected ? (
           <button className="button button-secondary" onClick={() => disconnect()}>

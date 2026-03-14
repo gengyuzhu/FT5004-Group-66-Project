@@ -1,70 +1,138 @@
 # MilestoneVault
 
-MilestoneVault is a milestone-based crowdfunding DApp that locks campaign funds in a Solidity contract, releases capital only after milestone voting passes, and opens rule-based refunds when fundraising fails or milestone execution breaks down.
+MilestoneVault is a milestone-based crowdfunding DApp that shifts project funding from "trust the platform" to "trust the code". Funds are escrowed in a Solidity contract, milestone proof is stored off-chain on IPFS, and creator payouts are only unlocked after contribution-weighted backer voting passes.
 
-## What is included
+## GitHub Pages Demo
 
-- `contracts/`: Hardhat 2 workspace with the `MilestoneVault` escrow contract, deployment scripts, ABI export, and unit tests.
-- `web/`: Next.js App Router frontend with wallet connection, campaign creation, contribution, proof upload, voting, milestone execution, withdraw, and refund flows.
-- `docs/`: Architecture notes, demo script, and limitations for grading/demo use.
+- Repository: [FT5004-Group-66-Project](https://github.com/gengyuzhu/FT5004-Group-66-Project)
+- Interactive repository demo: [MilestoneVault GitHub Pages](https://gengyuzhu.github.io/FT5004-Group-66-Project/)
+- Real DApp code: [`web/`](./web)
+- Static showcase for GitHub Pages: [`docs/`](./docs)
 
-## Core MVP behaviors
+The `web/` app is the real Next.js DApp with wallet actions and contract calls. The `docs/` folder contains a static, interactive GitHub Pages showcase so the repository itself can present a web-style product experience on GitHub.
 
-- Native ETH contributions only.
-- Campaign creation writes goal, fundraising deadline, milestone tranche amounts, milestone due dates, and metadata CID on-chain.
-- Milestone evidence is pinned to IPFS through Pinata; only the resulting CID is stored on-chain.
-- Backers vote with contribution-weighted voting power.
-- Quorum and voting duration are deployment-level defaults.
-- Creator withdrawals use the withdraw pattern.
-- If fundraising misses the goal, if a milestone vote fails, or if the creator misses a milestone deadline, backers can claim proportional refunds from unreleased escrow.
+## Core MVP Scope
 
-## Prerequisites
+- Native ETH crowdfunding only
+- Multi-campaign escrow contract
+- Creator milestone proof submission with IPFS CID storage
+- Contribution-weighted backer voting
+- Milestone-based phased creator payouts
+- Rule-based refunds for underfunded campaigns, failed votes, and missed milestone deadlines
+- Localhost and Sepolia deployment support
+- Responsive Next.js DApp plus GitHub Pages demo
 
-- Node.js 20.x
-- npm 10.x
-- MetaMask or another injected wallet
-- A Pinata JWT for real IPFS uploads
-- For Sepolia deployment: a Sepolia RPC URL and a funded deployer private key
+## Architecture
 
-## Local setup
+```text
++--------------------------------------------------------------+
+|                      Frontend (DApp)                         |
+|   Next.js / React + wagmi / viem + MetaMask connection      |
+|   Dashboard, campaign detail, create, vote, refund flows    |
++---------------------------+----------------------------------+
+                            | Read / Write via JSON-RPC
++---------------------------v----------------------------------+
+|               MilestoneVault Smart Contract                  |
+|        Solidity 0.8.24 + OpenZeppelin ReentrancyGuard       |
+|                                                              |
+|   On-chain state:                                            |
+|   - Campaign registry (creator, goal, deadline, status)      |
+|   - Milestones (amounts, due dates, proof CIDs, votes)       |
+|   - Contribution ledger (backer -> amount per campaign)      |
+|   - Withdrawable creator balances and refundable escrow       |
++---------------------------+----------------------------------+
+                            |
++---------------------------v----------------------------------+
+|                 Off-chain Storage (IPFS)                     |
+|   Campaign metadata, evidence files, proof JSON bundles      |
+|   Only CIDs are written on-chain for verification            |
++--------------------------------------------------------------+
+```
 
-1. Install dependencies:
-   - `cd contracts && npm install`
-   - `cd ../web && npm install`
-2. Copy the env templates:
-   - `contracts/.env.example` to `contracts/.env`
-   - `web/.env.example` to `web/.env.local`
-3. Start a local chain:
-   - `cd contracts`
-   - `npm run node`
-4. Deploy and export the ABI/address for the frontend:
-   - In a second terminal: `cd contracts`
-   - `npm run deploy:localhost`
-5. Run tests:
-   - `cd contracts`
-   - `npm test`
-6. Start the frontend:
-   - `cd web`
-   - `npm run dev`
-7. Open `http://localhost:3000`
+## Smart Contract State Machine
 
-## Sepolia deployment
+```text
+                    +-------------+
+        create      | Fundraising |
+       -----------> |    (0)      |
+                    +------+------+
+                           | finalizeCampaign() after deadline
+                    +------v------+
+               NO   | goal met?   |  YES
+              +-----|             |-----+
+              |     +-------------+     |
+       +------v------+          +-------v------+
+       |   Failed    |          |    Active    |
+       |    (1)      |          |     (2)      |
+       +------+------+          +-------+------+
+              |                         | submitProof -> vote -> execute
+              |                  +------v------+
+              |             NO   | vote passed? |  YES
+              |            +-----|              |--------+
+              |            |     +--------------+        |
+              |     +------v------+             +--------v--------+
+              |     |   Failed    |      ALL    | Next milestone  |
+              |     |    (1)      |   +-------> | or Completed(3) |
+              |     +-------------+   |         +-----------------+
+              |                       |
+              v                       v
+         claimRefund()          withdrawCreatorFunds()
+```
 
-1. Set `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY` in `contracts/.env`.
-2. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` in `web/.env.local`.
-3. Deploy:
-   - `cd contracts`
-   - `npm run deploy:sepolia`
-4. Restart the frontend so it picks up the exported deployment address.
+## Tech Stack
 
-## Verification commands
+| Layer | Technology |
+| --- | --- |
+| Smart Contract | Solidity 0.8.24 + OpenZeppelin Contracts |
+| Development | Hardhat 2.x |
+| Frontend | Next.js 15 + React 19 + TypeScript |
+| Web3 Client | wagmi 3.x + viem 2.x |
+| Wallet | MetaMask / injected wallet |
+| Storage | IPFS via Pinata, on-chain CID references |
+| Testing | Hardhat test runner + Chai |
+| GitHub Demo | Static HTML/CSS/JS in `docs/` + GitHub Pages workflow |
 
-- Contract compile: `cd contracts && npm run compile`
-- Contract tests: `cd contracts && npm test`
-- Frontend lint: `cd web && npm run lint`
-- Frontend build: `cd web && npm run build`
+## Project Structure
 
-## Contract surface
+```text
+milestone-vault/
+|-- .github/
+|   |-- workflows/
+|       |-- deploy-pages.yml
+|-- contracts/
+|   |-- contracts/
+|   |   |-- MilestoneVault.sol
+|   |   |-- test/
+|   |       |-- ReentrantRefundAttacker.sol
+|   |-- deployments/
+|   |   |-- milestone-vault-addresses.json
+|   |-- scripts/
+|   |   |-- deploy.js
+|   |   |-- export-frontend.js
+|   |-- test/
+|   |   |-- MilestoneVault.test.js
+|   |-- hardhat.config.js
+|   |-- package.json
+|-- docs/
+|   |-- index.html
+|   |-- site.css
+|   |-- site.js
+|   |-- architecture.md
+|   |-- demo-script.md
+|   |-- limitations.md
+|   |-- uml.md
+|-- web/
+|   |-- src/
+|   |   |-- app/
+|   |   |-- components/
+|   |   |-- lib/
+|   |-- package.json
+|-- .gitignore
+|-- LICENSE
+|-- README.md
+```
+
+## Public Contract Interface
 
 - `createCampaign(goal, fundraisingDeadline, milestoneAmounts, milestoneDueDates, metadataCID)`
 - `contribute(campaignId)` payable
@@ -76,23 +144,94 @@ MilestoneVault is a milestone-based crowdfunding DApp that locks campaign funds 
 - `claimRefund(campaignId)`
 - `failCampaignForMissedDeadline(campaignId)`
 
-## Important defaults
+## Test Coverage
+
+| Test Suite | Tests | Status |
+| --- | ---: | --- |
+| `createCampaign` | 6 | [OK] All passing |
+| `contribute` | 4 | [OK] All passing |
+| `finalizeCampaign` | 3 | [OK] All passing |
+| `submitMilestoneProof` | 3 | [OK] All passing |
+| `voteOnMilestone` | 5 | [OK] All passing |
+| `executeMilestone` | 5 | [OK] All passing |
+| `withdrawCreatorFunds` | 2 | [OK] All passing |
+| `claimRefund` | 4 | [OK] All passing |
+| `View functions` | 2 | [OK] All passing |
+| **Total** | **34** | **[OK] All passing** |
+
+Verified locally with:
+
+```bash
+cd contracts && npm test
+cd web && npm run lint
+cd web && npm run build
+```
+
+## What The Frontend Covers
+
+- Wallet connect and network switch
+- Campaign creation with milestone drafting
+- Campaign discovery dashboard with search
+- Campaign detail page with contribution, proof, vote, execute, withdraw, and refund actions
+- IPFS upload routes for campaign metadata and milestone proof bundles
+- Responsive layouts for desktop and mobile widths
+- Static GitHub Pages interaction demo for repository showcase
+
+## Local Setup
+
+1. Install dependencies:
+   - `cd contracts && npm install`
+   - `cd ../web && npm install`
+2. Copy environment templates:
+   - `contracts/.env.example` -> `contracts/.env`
+   - `web/.env.example` -> `web/.env.local`
+3. Start Hardhat local node:
+   - `cd contracts`
+   - `npm run node`
+4. Deploy locally and export ABI/address to the frontend:
+   - `cd contracts`
+   - `npm run deploy:localhost`
+5. Start the DApp:
+   - `cd web`
+   - `npm run dev`
+6. Open `http://localhost:3000`
+
+## Sepolia Deployment
+
+1. Set `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY` in `contracts/.env`
+2. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` in `web/.env.local`
+3. Deploy:
+   - `cd contracts`
+   - `npm run deploy:sepolia`
+4. Restart the frontend
+
+## Important Contract Defaults
 
 - Quorum: `20%` (`2000` basis points)
 - Voting duration: `3 days`
 - Milestones execute strictly in order
+- Creator cannot vote on own campaign
 - Refunds only cover unreleased escrow
 - Contract is intentionally non-upgradeable for MVP simplicity
 
-## Documentation
+## UML And Supporting Docs
 
-- [Architecture](./docs/architecture.md)
+- [Architecture Notes](./docs/architecture.md)
 - [Demo Script](./docs/demo-script.md)
-- [Limitations](./docs/limitations.md)
+- [Known Limitations](./docs/limitations.md)
+- [UML Diagrams](./docs/uml.md)
 
-## Git delivery
+The UML document includes:
 
-If the repo is not linked yet:
+- Domain class diagram
+- Funding and activation sequence diagram
+- Milestone approval sequence diagram
+- State diagram
+- Component diagram
+
+## Git Delivery
+
+This repository is configured for `main` and GitHub Pages deployment through GitHub Actions.
 
 ```bash
 git remote add origin https://github.com/gengyuzhu/FT5004-Group-66-Project.git

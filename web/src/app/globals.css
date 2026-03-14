@@ -61,6 +61,41 @@ img {
   padding: 32px 0 56px;
 }
 
+.app-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: rgba(255, 250, 241, 0.72);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+
+.brand-lockup {
+  display: grid;
+  gap: 4px;
+}
+
+.brand-lockup strong {
+  font-size: 1.2rem;
+  letter-spacing: -0.03em;
+}
+
+.brand-lockup span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.chrome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .hero,
 .detail-hero {
   display: grid;
@@ -76,7 +111,8 @@ img {
 .form-panel,
 .campaign-list,
 .detail-card,
-.detail-cover {
+.detail-cover,
+.overview-panel {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 28px;
@@ -89,12 +125,14 @@ img {
 .wallet-panel,
 .form-panel,
 .campaign-list,
-.detail-card {
+.detail-card,
+.overview-panel {
   padding: 28px;
 }
 
 .hero-copy h1,
-.detail-copy h1 {
+.detail-copy h1,
+.not-found-card h1 {
   font-size: clamp(2.5rem, 5vw, 4.6rem);
   line-height: 0.95;
   letter-spacing: -0.05em;
@@ -112,11 +150,25 @@ img {
   max-width: 62ch;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
 .hero-metrics {
   padding: 24px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .metric-card,
@@ -152,7 +204,12 @@ img {
 .action-stack,
 .campaign-form,
 .milestone-editor-list,
-.activity-list {
+.activity-list,
+.insight-grid,
+.flow-list,
+.detail-strip,
+.network-guide,
+.link-cluster {
   display: grid;
   gap: 18px;
 }
@@ -258,7 +315,8 @@ textarea:focus {
 .button-row,
 .proof-files,
 .campaign-grid,
-.milestone-list {
+.milestone-list,
+.draft-summary {
   display: grid;
   gap: 14px;
 }
@@ -280,11 +338,22 @@ textarea:focus {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.insight-grid,
+.detail-strip,
+.network-guide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .campaign-card,
 .action-box,
 .milestone-card,
 .milestone-editor,
-.activity-item {
+.activity-item,
+.insight-card,
+.flow-step,
+.mini-card,
+.network-guide-card,
+.summary-chip {
   border: 1px solid rgba(31, 47, 50, 0.1);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.72);
@@ -327,6 +396,54 @@ textarea:focus {
   color: var(--teal);
 }
 
+.flow-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: rgba(188, 101, 64, 0.12);
+  color: var(--accent);
+  font-family: var(--font-mono), monospace;
+  font-weight: 600;
+}
+
+.step-body {
+  display: grid;
+  gap: 6px;
+}
+
+.network-guide-card p {
+  margin-top: 8px;
+}
+
+.draft-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summary-chip {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-chip-ok {
+  border-color: rgba(15, 123, 108, 0.18);
+  background: rgba(15, 123, 108, 0.08);
+}
+
+.summary-chip-warn {
+  border-color: rgba(188, 101, 64, 0.2);
+  background: rgba(188, 101, 64, 0.08);
+}
+
 .detail-cover {
   min-height: 340px;
   position: relative;
@@ -335,6 +452,24 @@ textarea:focus {
 
 .detail-cover img {
   object-fit: cover;
+}
+
+.detail-strip {
+  margin-bottom: 24px;
+}
+
+.mini-card {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-card strong {
+  font-size: 1.2rem;
+}
+
+.link-cluster {
+  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .proof-box {
@@ -372,9 +507,22 @@ textarea:focus {
   font-size: 0.82rem;
 }
 
+.not-found-shell {
+  display: grid;
+  align-items: center;
+  min-height: calc(100vh - 40px);
+}
+
+.not-found-card {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
 @media (max-width: 1080px) {
+  .app-chrome,
   .hero,
   .detail-hero,
+  .overview-grid,
   .dashboard-grid,
   .detail-grid {
     grid-template-columns: 1fr;
@@ -392,27 +540,34 @@ textarea:focus {
     padding: 20px 0 36px;
   }
 
+  .app-chrome,
   .hero-copy,
   .detail-copy,
   .wallet-panel,
   .form-panel,
   .campaign-list,
   .detail-card,
-  .detail-cover {
+  .detail-cover,
+  .overview-panel {
     padding: 22px;
   }
 
   .hero-copy h1,
-  .detail-copy h1 {
+  .detail-copy h1,
+  .not-found-card h1 {
     font-size: 2.4rem;
   }
 
   .wallet-summary,
   .wallet-actions,
   .form-two-up,
+  .draft-summary,
+  .network-guide,
   .campaign-stats,
   .campaign-footer,
   .detail-stats,
+  .detail-strip,
+  .insight-grid,
   .button-row,
   .proof-files,
   .milestone-facts,
@@ -420,6 +575,7 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .app-chrome,
   .section-heading,
   .subsection-header,
   .campaign-card-header,

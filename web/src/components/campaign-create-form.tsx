@@ -46,6 +46,13 @@ export function CampaignCreateForm({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const numericGoal = Number.parseFloat(goal || "0");
+  const milestoneDraftTotal = milestones.reduce(
+    (sum, milestone) => sum + (Number.parseFloat(milestone.amount || "0") || 0),
+    0,
+  );
+  const remainingAllocation = numericGoal - milestoneDraftTotal;
+  const allocationMatchesGoal = goal.trim() !== "" && Math.abs(remainingAllocation) < 0.000001;
 
   function updateMilestone(index: number, field: keyof MilestoneInput, value: string) {
     setMilestones((currentMilestones) =>
@@ -262,16 +269,27 @@ export function CampaignCreateForm({
           </button>
         </div>
 
+        <div className="draft-summary">
+          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : ""}`}>
+            <span className="field-label">Goal</span>
+            <strong>{goal.trim() ? `${goal} ETH` : "Not set"}</strong>
+          </div>
+          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : ""}`}>
+            <span className="field-label">Milestone total</span>
+            <strong>{milestoneDraftTotal ? `${milestoneDraftTotal.toFixed(4)} ETH` : "0 ETH"}</strong>
+          </div>
+          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : "summary-chip-warn"}`}>
+            <span className="field-label">Remaining allocation</span>
+            <strong>{goal.trim() ? `${remainingAllocation.toFixed(4)} ETH` : "Set goal first"}</strong>
+          </div>
+        </div>
+
         <div className="milestone-editor-list">
           {milestones.map((milestone, index) => (
             <article className="milestone-editor" key={`${index}-${milestone.title}`}>
               <div className="milestone-editor-header">
                 <strong>Milestone {index + 1}</strong>
-                <button
-                  className="inline-link"
-                  onClick={() => removeMilestone(index)}
-                  type="button"
-                >
+                <button className="inline-link" onClick={() => removeMilestone(index)} type="button">
                   Remove
                 </button>
               </div>

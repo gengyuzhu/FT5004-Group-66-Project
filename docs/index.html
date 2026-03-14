@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MilestoneVault GitHub Demo</title>
+    <meta
+      name="description"
+      content="Interactive GitHub Pages demo for the MilestoneVault milestone crowdfunding DApp."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./site.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top">MilestoneVault</a>
+      <nav class="topnav">
+        <a href="#demo">Demo</a>
+        <a href="#experience">Experience</a>
+        <a href="https://github.com/gengyuzhu/FT5004-Group-66-Project/blob/main/docs/uml.md">UML</a>
+        <a href="https://github.com/gengyuzhu/FT5004-Group-66-Project#readme">README</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">GitHub Pages Demo</p>
+          <h1>Interactive milestone crowdfunding, directly from the repository.</h1>
+          <p class="hero-text">
+            This static showcase mirrors the MilestoneVault product flow on GitHub Pages: wallet
+            connect, campaign browsing, milestone review, voting, payout, refund logic, and mobile
+            responsiveness. The real DApp lives in <code>/web</code>; this demo makes the repo
+            presentation layer interactive even without a backend.
+          </p>
+          <div class="hero-actions">
+            <a class="button" href="#demo">Launch Demo</a>
+            <a class="button button-secondary" href="https://github.com/gengyuzhu/FT5004-Group-66-Project">
+              Open Repository
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Milestone voting</span>
+              <strong>Contribution-weighted</strong>
+            </article>
+            <article class="metric-card">
+              <span>Escrow control</span>
+              <strong>Rule-enforced</strong>
+            </article>
+            <article class="metric-card">
+              <span>Proof storage</span>
+              <strong>IPFS + CID</strong>
+            </article>
+            <article class="metric-card">
+              <span>GitHub-ready</span>
+              <strong>Static interactive demo</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="demo-shell" id="demo">
+        <div class="demo-toolbar">
+          <div class="toolbar-group">
+            <span class="eyebrow">Wallet</span>
+            <button class="button" id="wallet-toggle">Connect Wallet</button>
+          </div>
+          <div class="toolbar-group">
+            <span class="eyebrow">Network</span>
+            <div class="chip-row" id="network-switcher"></div>
+          </div>
+          <div class="toolbar-group">
+            <span class="eyebrow">Filter</span>
+            <div class="chip-row" id="filter-switcher"></div>
+          </div>
+        </div>
+
+        <div class="demo-layout">
+          <section class="panel campaign-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Campaign Ledger</p>
+                <h2>Simulated dashboard cards</h2>
+              </div>
+              <span class="status-pill" id="wallet-state">Wallet offline</span>
+            </div>
+            <div class="campaign-grid" id="campaign-grid"></div>
+          </section>
+
+          <section class="panel detail-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Selected Campaign</p>
+                <h2 id="detail-title">Choose a campaign</h2>
+              </div>
+              <span class="status-pill" id="detail-status">Preview</span>
+            </div>
+
+            <div class="detail-grid">
+              <div class="detail-main">
+                <div class="detail-card" id="detail-summary"></div>
+                <div class="detail-card">
+                  <div class="section-title">
+                    <p class="eyebrow">Milestone Timeline</p>
+                    <h3>Execution-ready breakdown</h3>
+                  </div>
+                  <div id="milestone-list"></div>
+                </div>
+              </div>
+
+              <aside class="detail-side">
+                <div class="detail-card">
+                  <div class="section-title">
+                    <p class="eyebrow">Action Simulator</p>
+                    <h3>Mock interactions</h3>
+                  </div>
+                  <div class="action-stack" id="action-stack"></div>
+                </div>
+
+                <div class="detail-card">
+                  <div class="section-title">
+                    <p class="eyebrow">Activity Feed</p>
+                    <h3>Simulated on-chain log</h3>
+                  </div>
+                  <div class="activity-list" id="activity-list"></div>
+                </div>
+              </aside>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="experience-grid" id="experience">
+        <article class="panel narrative-card">
+          <p class="eyebrow">Desktop UX</p>
+          <h2>Clean command surface, dense information, minimal friction.</h2>
+          <p>
+            The real DApp favors immediate readability: wallet, campaign creation, milestone
+            actions, vote windows, and refunds stay visible without hiding the trust model.
+          </p>
+        </article>
+        <article class="panel phone-preview">
+          <div class="phone-shell">
+            <div class="phone-top">
+              <span class="phone-dot"></span>
+              <span class="phone-dot"></span>
+              <span class="phone-dot"></span>
+            </div>
+            <div class="phone-screen" id="phone-screen"></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Architecture Snapshot</p>
+            <h2>What this GitHub demo is representing</h2>
+          </div>
+        </div>
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>Frontend</span>
+            <strong>Next.js DApp</strong>
+          </article>
+          <article class="metric-card">
+            <span>Contract</span>
+            <strong>MilestoneVault.sol</strong>
+          </article>
+          <article class="metric-card">
+            <span>Voting rule</span>
+            <strong>Weighted by contributions</strong>
+          </article>
+          <article class="metric-card">
+            <span>Proof storage</span>
+            <strong>IPFS CIDs on-chain</strong>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./site.js"></script>
+  </body>
+  </html>

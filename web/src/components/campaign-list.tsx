@@ -7,6 +7,7 @@ import {
   getCampaignStatusLabel,
   getFailureReasonLabel,
   getProgressPercentage,
+  shortAddress,
 } from "@/lib/utils";
 
 type CampaignListProps = {
@@ -60,7 +61,7 @@ export function CampaignList({
             <article className="campaign-card" key={campaign.id.toString()}>
               <div className="campaign-card-header">
                 <p className="eyebrow">
-                  Campaign #{campaign.id.toString()} · {getCampaignStatusLabel(campaign.contract.status)}
+                  Campaign #{campaign.id.toString()} | {getCampaignStatusLabel(campaign.contract.status)}
                 </p>
                 <Link href={`/campaigns/${campaign.id.toString()}`} className="inline-link">
                   Open detail
@@ -93,6 +94,10 @@ export function CampaignList({
               </div>
 
               <div className="campaign-footer">
+                <div>
+                  <span className="field-label">Creator</span>
+                  <strong>{shortAddress(campaign.contract.creator)}</strong>
+                </div>
                 <div>
                   <span className="field-label">Current milestone</span>
                   <strong>

@@ -6,9 +6,9 @@ import { useEffect, useState, useTransition } from "react";
 import { parseEther } from "viem";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 
+import { milestoneVaultAbi } from "@/lib/contracts/milestoneVault";
 import { defaultChainId } from "@/lib/config";
 import { getIpfsUrl } from "@/lib/ipfs";
-import { milestoneVaultAbi } from "@/lib/contracts/milestoneVault";
 import {
   fetchCampaign,
   fetchCampaignActivity,
@@ -16,7 +16,13 @@ import {
   normalizeBackerState,
   normalizeVoteReceipt,
 } from "@/lib/milestone-vault";
-import { CampaignStatus, type ActivityItem, type BackerState, type CampaignViewModel, type VoteReceipt } from "@/lib/types";
+import {
+  CampaignStatus,
+  type ActivityItem,
+  type BackerState,
+  type CampaignViewModel,
+  type VoteReceipt,
+} from "@/lib/types";
 import {
   compareAddresses,
   formatEth,
@@ -109,9 +115,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
 
           if (!ignore) {
             setBackerState(normalizeBackerState(backerStateRaw));
-            setVoteReceipt(
-              voteReceiptRaw ? normalizeVoteReceipt(voteReceiptRaw) : null,
-            );
+            setVoteReceipt(voteReceiptRaw ? normalizeVoteReceipt(voteReceiptRaw) : null);
           }
         } else if (!ignore) {
           setBackerState(null);
@@ -446,7 +450,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       <section className="detail-hero">
         <div className="detail-copy">
           <p className="eyebrow">
-            Campaign #{campaign.id.toString()} · {getCampaignStatusLabel(campaign.contract.status)}
+            Campaign #{campaign.id.toString()} | {getCampaignStatusLabel(campaign.contract.status)}
           </p>
           <h1>{campaign.metadata?.title ?? "Untitled campaign"}</h1>
           <p className="hero-text">
@@ -472,6 +476,22 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <strong>{getFailureReasonLabel(campaign.contract.failureReason)}</strong>
             </div>
           </div>
+
+          {campaign.metadata?.externalLinks?.length ? (
+            <div className="link-cluster">
+              {campaign.metadata.externalLinks.map((externalLink) => (
+                <a
+                  className="inline-link"
+                  href={externalLink}
+                  key={externalLink}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {externalLink}
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {campaign.metadata?.coverImageCid ? (
@@ -485,6 +505,28 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             />
           </div>
         ) : null}
+      </section>
+
+      <section className="detail-strip">
+        <article className="mini-card">
+          <span className="field-label">Milestone progress</span>
+          <strong>
+            {Math.min(Number(campaign.contract.currentMilestone) + 1, Number(campaign.contract.milestoneCount))} /{" "}
+            {Number(campaign.contract.milestoneCount)}
+          </strong>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Approved payout</span>
+          <strong>{formatEth(campaign.contract.approvedPayoutTotal)}</strong>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Refund pool</span>
+          <strong>{formatEth(campaign.refundPool)}</strong>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Creator withdrawn</span>
+          <strong>{formatEth(campaign.contract.creatorWithdrawn)}</strong>
+        </article>
       </section>
 
       <div className="detail-grid">
@@ -550,6 +592,17 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       <p className="muted-text">
                         {milestone.proof?.summary ?? "Proof bundle metadata is available at the stored CID."}
                       </p>
+
+                      {milestone.proof?.demoLinks.length ? (
+                        <div className="proof-files">
+                          {milestone.proof.demoLinks.map((demoLink) => (
+                            <a className="inline-link" href={demoLink} key={demoLink} rel="noreferrer" target="_blank">
+                              Demo link
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+
                       {milestone.proof?.fileCids.length ? (
                         <div className="proof-files">
                           {milestone.proof.fileCids.map((file) => (
@@ -610,6 +663,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <div className="action-box">
                 <span className="field-label">Fundraising deadline</span>
                 <strong>{formatTimestamp(campaign.contract.fundraisingDeadline)}</strong>
+                <p className="muted-text">
+                  Backers can fund until the deadline. Anyone can finalize once the fundraising window closes.
+                </p>
                 <label>
                   <span className="field-label">Contribute (ETH)</span>
                   <input
@@ -642,6 +698,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <div className="action-box">
                 <span className="field-label">Creator withdrawable</span>
                 <strong>{formatEth(campaign.withdrawable)}</strong>
+                <p className="muted-text">
+                  Approved milestone tranches are paid out through the pull-payment withdraw pattern.
+                </p>
                 <button
                   className="button"
                   disabled={!isConnected || isWorking || !canWithdraw}
@@ -654,6 +713,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               <div className="action-box">
                 <span className="field-label">Backer refund</span>
                 <strong>{formatEth(backerState?.refundAmount ?? 0n)}</strong>
+                <p className="muted-text">
+                  Refunds only draw from unreleased escrow after underfunding, rejection, or missed deadlines.
+                </p>
                 <button
                   className="button"
                   disabled={!isConnected || isWorking || !canRefund}
@@ -668,7 +730,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                   <span className="field-label">Current milestone</span>
                   <strong>{currentMilestone.metadata?.title ?? `Milestone ${currentMilestone.id + 1}`}</strong>
                   <p className="muted-text">
-                    Due {formatTimestamp(currentMilestone.contract.dueDate)} · voting ends{" "}
+                    Due {formatTimestamp(currentMilestone.contract.dueDate)} | voting ends{" "}
                     {currentMilestone.contract.voteEnd
                       ? formatTimestamp(currentMilestone.contract.voteEnd)
                       : "after proof submission"}
