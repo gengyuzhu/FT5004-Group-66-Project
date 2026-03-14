@@ -25,6 +25,7 @@ MilestoneVault is a milestone-based crowdfunding DApp that addresses the core tr
 - **Automatic refunds** — If a campaign is underfunded, a milestone vote fails, or a deadline is missed, backers can claim proportional refunds from unreleased escrow
 - **IPFS evidence storage** — Campaign metadata and milestone proof live off-chain, while CIDs are stored on-chain for integrity verification
 - **Responsive product UI** — A real Next.js DApp and a matching GitHub Pages demo both support desktop and mobile layouts
+- **User-friendly interaction layer** — The dashboard now includes live sorting, stronger card hierarchy, skeleton loading states, draft readiness feedback, and a clearer action assistant on campaign detail pages
 
 ## Architecture
 

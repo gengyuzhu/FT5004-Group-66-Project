@@ -1,8 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 
+import { getIpfsUrl } from "@/lib/ipfs";
 import type { CampaignViewModel } from "@/lib/types";
 import {
   formatEth,
+  formatShortEth,
   formatTimeRemaining,
   formatTimestamp,
   getCampaignStatusAccent,
@@ -21,12 +24,21 @@ type CampaignListProps = {
   totalPages: number;
   onPageChange: (value: number) => void;
   searchTerm: string;
+  sortBy: "latest" | "progress" | "goal" | "ending";
+  statusCounts: Record<string, number>;
   statusFilter: string;
   onSearchChange: (value: string) => void;
+  onSortChange: (value: "latest" | "progress" | "goal" | "ending") => void;
   onStatusFilterChange: (value: string) => void;
 };
 
 const filters = ["all", "fundraising", "active", "completed", "failed"];
+const sortOptions = [
+  { value: "latest", label: "Newest first" },
+  { value: "progress", label: "Funding progress" },
+  { value: "goal", label: "Largest goal" },
+  { value: "ending", label: "Urgent next step" },
+] as const;
 
 function getFilterLabel(filter: string) {
   return filter.charAt(0).toUpperCase() + filter.slice(1);
@@ -41,8 +53,11 @@ export function CampaignList({
   totalPages,
   onPageChange,
   searchTerm,
+  sortBy,
+  statusCounts,
   statusFilter,
   onSearchChange,
+  onSortChange,
   onStatusFilterChange,
 }: CampaignListProps) {
   return (
@@ -50,17 +65,36 @@ export function CampaignList({
       <div className="surface-header">
         <div>
           <p className="eyebrow">Campaign Directory</p>
-          <h2>Browse live milestone crowdfunding campaigns.</h2>
+          <h2>Browse live milestone crowdfunding campaigns with faster scanning controls.</h2>
         </div>
 
-        <label className="search-field">
-          <span className="field-label">Search</span>
-          <input
-            placeholder="Search title, creator, campaign id, or status"
-            value={searchTerm}
-            onChange={(event) => onSearchChange(event.target.value)}
-          />
-        </label>
+        <div className="search-toolbar">
+          <label className="search-field">
+            <span className="field-label">Search</span>
+            <input
+              placeholder="Search title, creator, campaign id, or status"
+              value={searchTerm}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </label>
+
+          <label className="search-field search-field-sort">
+            <span className="field-label">Sort</span>
+            <select
+              aria-label="Sort campaigns"
+              value={sortBy}
+              onChange={(event) =>
+                onSortChange(event.target.value as "latest" | "progress" | "goal" | "ending")
+              }
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="filter-row">
@@ -72,8 +106,21 @@ export function CampaignList({
             type="button"
           >
             {getFilterLabel(filter)}
+            <span className="filter-chip-count">{statusCounts[filter] ?? 0}</span>
           </button>
         ))}
+      </div>
+
+      <div className="results-toolbar">
+        <div className="results-copy">
+          <span className="field-label">Results</span>
+          <strong>{totalItems} matching campaigns</strong>
+        </div>
+        {searchTerm ? (
+          <button className="button button-ghost button-small" onClick={() => onSearchChange("")} type="button">
+            Clear search
+          </button>
+        ) : null}
       </div>
 
       {isLoading ? <p className="feedback">Loading campaign state from the selected chain...</p> : null}
@@ -83,9 +130,34 @@ export function CampaignList({
       ) : null}
 
       <div className="campaign-grid">
-        {campaigns.map((campaign, index) => {
+        {isLoading
+          ? Array.from({ length: 6 }, (_, index) => (
+              <article className="campaign-card campaign-card-skeleton" key={`skeleton-${index}`}>
+                <div className="campaign-card-cover campaign-card-cover-skeleton" />
+                <div className="skeleton-line skeleton-line-title" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line skeleton-line-short" />
+                <div className="skeleton-grid">
+                  <div className="skeleton-chip" />
+                  <div className="skeleton-chip" />
+                  <div className="skeleton-chip" />
+                  <div className="skeleton-chip" />
+                </div>
+              </article>
+            ))
+          : null}
+        {!isLoading
+          ? campaigns.map((campaign, index) => {
           const progress = getProgressPercentage(campaign.contract.totalRaised, campaign.contract.goal);
           const statusLabel = getCampaignStatusLabel(campaign.contract.status);
+          const currentMilestone = campaign.milestones[Number(campaign.contract.currentMilestone)]?.contract;
+          const nextCheckpoint =
+            Number(campaign.contract.status) === 0
+              ? campaign.contract.fundraisingDeadline
+              : currentMilestone?.dueDate ?? campaign.contract.fundraisingDeadline;
+          const coverImageUrl = campaign.metadata?.coverImageCid
+            ? getIpfsUrl(campaign.metadata.coverImageCid)
+            : null;
 
           return (
             <article
@@ -93,17 +165,54 @@ export function CampaignList({
               key={campaign.id.toString()}
               style={{ animationDelay: `${index * 60}ms` }}
             >
-              <div className="campaign-card-topline">
-                <span className={`status-pill ${getCampaignStatusAccent(campaign.contract.status)}`}>
-                  {statusLabel}
-                </span>
-                <span className="mono-note">#{campaign.id.toString()}</span>
+              <div className="campaign-card-cover">
+                {coverImageUrl ? (
+                  <Image
+                    alt={campaign.metadata?.title ?? `Campaign ${campaign.id.toString()}`}
+                    fill
+                    sizes="(max-width: 780px) 100vw, (max-width: 1240px) 50vw, 33vw"
+                    src={coverImageUrl}
+                  />
+                ) : (
+                  <div className="campaign-card-cover-fallback">
+                    <span className="eyebrow">MilestoneVault</span>
+                    <strong>{campaign.metadata?.title ?? `Campaign #${campaign.id.toString()}`}</strong>
+                  </div>
+                )}
+
+                <div className="campaign-card-topline">
+                  <span className={`status-pill ${getCampaignStatusAccent(campaign.contract.status)}`}>
+                    {statusLabel}
+                  </span>
+                  <span className="mono-note">#{campaign.id.toString()}</span>
+                </div>
               </div>
 
-              <h3>{campaign.metadata?.title ?? "Untitled campaign"}</h3>
+              <div className="campaign-card-copy">
+                <h3>{campaign.metadata?.title ?? "Untitled campaign"}</h3>
+                <p className="muted-text">
+                  {campaign.metadata?.summary ??
+                    "Metadata could not be resolved from IPFS, but the on-chain campaign remains accessible."}
+                </p>
+              </div>
+
+              <div className="campaign-highlight-row">
+                <article className="campaign-highlight-chip">
+                  <span className="field-label">Escrowed</span>
+                  <strong>{formatShortEth(campaign.contract.totalRaised, 2)} ETH</strong>
+                </article>
+                <article className="campaign-highlight-chip">
+                  <span className="field-label">Next checkpoint</span>
+                  <strong>{formatTimeRemaining(nextCheckpoint)}</strong>
+                </article>
+              </div>
+
               <p className="muted-text">
-                {campaign.metadata?.summary ??
-                  "Metadata could not be resolved from IPFS, but the on-chain campaign remains accessible."}
+                {Number(campaign.contract.status) === 1
+                  ? getFailureReasonLabel(campaign.contract.failureReason)
+                  : Number(campaign.contract.status) === 2
+                    ? "Milestone approval is now governing payout release."
+                    : "Fundraising stays open until the deadline or target is reached."}
               </p>
 
               <div className="campaign-progress-copy">
@@ -129,23 +238,24 @@ export function CampaignList({
                 </div>
                 <div>
                   <span className="field-label">Funding window</span>
-                  <strong>{formatTimeRemaining(campaign.contract.fundraisingDeadline)}</strong>
+                  <strong>{formatTimeRemaining(nextCheckpoint)}</strong>
                 </div>
                 <div>
-                  <span className="field-label">Failure rule</span>
-                  <strong>{getFailureReasonLabel(campaign.contract.failureReason)}</strong>
+                  <span className="field-label">Settlement</span>
+                  <strong>{Number(campaign.contract.status) === 3 ? "Finished" : "In progress"}</strong>
                 </div>
               </div>
 
               <div className="campaign-card-footer">
                 <span className="mono-note">{formatTimestamp(campaign.contract.fundraisingDeadline)}</span>
-                <Link className="inline-link" href={`/campaigns/${campaign.id.toString()}`}>
+                <Link className="button button-ghost button-small button-link" href={`/campaigns/${campaign.id.toString()}`}>
                   Open campaign
                 </Link>
               </div>
             </article>
           );
-        })}
+            })
+          : null}
       </div>
 
       {totalItems > 0 ? (

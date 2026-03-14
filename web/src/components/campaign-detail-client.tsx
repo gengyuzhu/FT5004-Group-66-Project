@@ -393,6 +393,41 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     );
   }
 
+  function renderLoadingState() {
+    return (
+      <main className="detail-shell">
+        <AppTopbar backHref="/" backLabel="Back to dashboard" />
+        <section className="detail-hero-card">
+          <div className="detail-hero-copy">
+            <div className="skeleton-line skeleton-line-short" />
+            <div className="skeleton-line skeleton-line-title" />
+            <div className="skeleton-line" />
+            <div className="skeleton-line" />
+            <div className="hero-inline-stats">
+              {Array.from({ length: 4 }, (_, index) => (
+                <article className="mini-card campaign-card-skeleton" key={index}>
+                  <div className="skeleton-line skeleton-line-short" />
+                  <div className="skeleton-line skeleton-line-title" />
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="detail-cover campaign-card-cover-skeleton" />
+        </section>
+
+        <section className="detail-signal-grid">
+          {Array.from({ length: 3 }, (_, index) => (
+            <article className="mini-card campaign-card-skeleton" key={index}>
+              <div className="skeleton-line skeleton-line-short" />
+              <div className="skeleton-line skeleton-line-title" />
+              <div className="skeleton-line" />
+            </article>
+          ))}
+        </section>
+      </main>
+    );
+  }
+
   if (!campaignIdValue) {
     return renderShellMessage("The campaign id must be a valid integer.", true);
   }
@@ -402,7 +437,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   }
 
   if (isLoading) {
-    return renderShellMessage("Loading campaign detail from the chain...");
+    return renderLoadingState();
   }
 
   if (!campaign) {
@@ -459,6 +494,48 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
       : "Observer";
   const statusLabel = getCampaignStatusLabel(campaign.contract.status);
   const statusAccent = getCampaignStatusAccent(campaign.contract.status);
+  const quorumProgress =
+    quorumTarget > 0n ? Math.min(Number((currentParticipation * 10_000n) / quorumTarget) / 100, 100) : 0;
+  const voteWindowLabel = currentMilestone
+    ? currentMilestone.contract.voteEnd
+      ? now < currentMilestone.contract.voteEnd
+        ? formatTimeRemaining(currentMilestone.contract.voteEnd)
+        : "Vote window closed"
+      : "Vote not opened"
+    : "Completed";
+  const currentMilestoneTitle = currentMilestone?.metadata?.title ?? `Milestone ${currentMilestoneIndex + 1}`;
+
+  let nextActionTitle = "Awaiting contract activity";
+  let nextActionCopy =
+    "This campaign is visible and readable, but there is no immediate wallet action available for your role yet.";
+
+  if (canFinalize) {
+    nextActionTitle = "Finalize fundraising";
+    nextActionCopy = "The fundraising deadline has passed. Anyone can now finalize the campaign into Active or Failed.";
+  } else if (canSubmitProof) {
+    nextActionTitle = "Submit milestone proof";
+    nextActionCopy =
+      "The campaign is active and waiting for the creator to publish the current milestone evidence bundle.";
+  } else if (canVote) {
+    nextActionTitle = "Cast your vote";
+    nextActionCopy = "The proof bundle is live. Backers can now approve or reject the current milestone.";
+  } else if (canExecute) {
+    nextActionTitle = "Execute milestone result";
+    nextActionCopy = "The vote window has closed. Anyone can now execute the milestone outcome on-chain.";
+  } else if (canWithdraw) {
+    nextActionTitle = "Withdraw approved payout";
+    nextActionCopy = "Milestone funds are unlocked for the creator and can now be pulled from the contract.";
+  } else if (canRefund) {
+    nextActionTitle = "Claim refund";
+    nextActionCopy = "The campaign failed and your backer refund is now available from the remaining escrow pool.";
+  } else if (canFailForMissedDeadline) {
+    nextActionTitle = "Fail missed deadline";
+    nextActionCopy =
+      "The creator missed the current milestone deadline without submitting proof. Anyone can fail the campaign.";
+  } else if (Number(campaign.contract.status) === CampaignStatus.Completed) {
+    nextActionTitle = "Campaign completed";
+    nextActionCopy = "All milestones have executed successfully and the phased payout schedule is complete.";
+  }
 
   return (
     <main className="detail-shell">
@@ -476,6 +553,12 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             {campaign.metadata?.summary ??
               "Campaign metadata could not be resolved from IPFS, but the on-chain state remains readable."}
           </p>
+
+          <div className="hero-pill-row hero-pill-row-tight">
+            <span className="hero-pill">Role: {currentRole}</span>
+            <span className="hero-pill">Quorum {formatShortEth(quorumTarget)} ETH</span>
+            <span className="hero-pill">Window: {voteWindowLabel}</span>
+          </div>
 
           <div className="detail-progress-panel">
             <div className="campaign-progress-copy">
@@ -550,6 +633,30 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
         <article className="mini-card">
           <span className="field-label">Current milestone due</span>
           <strong>{currentMilestone ? formatTimeRemaining(currentMilestone.contract.dueDate) : "Completed"}</strong>
+        </article>
+      </section>
+
+      <section className="detail-signal-grid">
+        <article className="mini-card mini-card-emphasis">
+          <span className="field-label">Next best action</span>
+          <strong>{nextActionTitle}</strong>
+          <p className="muted-text">{nextActionCopy}</p>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Quorum progress</span>
+          <strong>{quorumProgress.toFixed(0)}%</strong>
+          <div className="progress-track progress-track-dark">
+            <span style={{ width: `${quorumProgress}%` }} />
+          </div>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Current milestone</span>
+          <strong>{currentMilestone ? currentMilestoneTitle : "All milestones complete"}</strong>
+          <p className="muted-text">
+            {currentMilestone
+              ? `${formatEth(currentMilestone.contract.amount)} unlocks when the vote passes.`
+              : "No pending milestone actions remain on this campaign."}
+          </p>
         </article>
       </section>
 
@@ -646,9 +753,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                   <div className="current-milestone-banner">
                     <div>
                       <span className="field-label">Current milestone</span>
-                      <strong>
-                        {currentMilestone.metadata?.title ?? `Milestone ${currentMilestone.id + 1}`}
-                      </strong>
+                      <strong>{currentMilestoneTitle}</strong>
                     </div>
                     <p className="muted-text">
                       Due {formatTimestamp(currentMilestone.contract.dueDate)}. Voting progress is{" "}
@@ -743,6 +848,10 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                         </div>
                         <div className="progress-track progress-track-dark">
                           <span style={{ width: `${voteProgress}%` }} />
+                        </div>
+                        <div className="vote-split-bar" aria-hidden="true">
+                          <span className="vote-split-yes" style={{ width: `${yesShare}%` }} />
+                          <span className="vote-split-no" style={{ width: `${noShare}%` }} />
                         </div>
                         <div className="vote-breakdown">
                           <span>YES {yesShare.toFixed(0)}%</span>
@@ -863,6 +972,12 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             </div>
 
             <div className="action-grid">
+              <div className="action-card action-card-emphasis">
+                <span className="field-label">Action assistant</span>
+                <strong>{nextActionTitle}</strong>
+                <p className="muted-text">{nextActionCopy}</p>
+              </div>
+
               <div className="action-card">
                 <span className="field-label">Fundraising</span>
                 <strong>{formatTimestamp(campaign.contract.fundraisingDeadline)}</strong>

@@ -10,7 +10,7 @@ import { WalletPanel } from "@/components/wallet-panel";
 import { defaultChainId } from "@/lib/config";
 import { fetchCampaigns, hasMilestoneVaultDeployment } from "@/lib/milestone-vault";
 import type { CampaignViewModel } from "@/lib/types";
-import { formatEth, getCampaignStatusLabel } from "@/lib/utils";
+import { formatEth, formatTimeRemaining, getCampaignStatusLabel } from "@/lib/utils";
 
 const browseHighlights = [
   "Campaign funds stay escrowed inside the contract until milestone execution passes.",
@@ -18,6 +18,7 @@ const browseHighlights = [
   "Backers approve or reject each active milestone with contribution-weighted voting power.",
 ];
 const pageSize = 6;
+type SortOption = "latest" | "progress" | "goal" | "ending";
 
 export function DashboardShell() {
   const activeChainId = useChainId();
@@ -28,6 +29,7 @@ export function DashboardShell() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<SortOption>("latest");
   const [page, setPage] = useState(1);
   const [surface, setSurface] = useState<"browse" | "create">("browse");
   const deferredSearch = useDeferredValue(searchTerm);
@@ -104,9 +106,38 @@ export function DashboardShell() {
 
     return matchesSearch && matchesStatus;
   });
-  const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / pageSize));
+  const sortedCampaigns = [...filteredCampaigns].sort((left, right) => {
+    switch (sortBy) {
+      case "progress": {
+        const leftProgress =
+          left.contract.goal > 0n ? (left.contract.totalRaised * 10_000n) / left.contract.goal : 0n;
+        const rightProgress =
+          right.contract.goal > 0n ? (right.contract.totalRaised * 10_000n) / right.contract.goal : 0n;
+        return Number(rightProgress - leftProgress);
+      }
+      case "goal":
+        return Number(right.contract.goal - left.contract.goal);
+      case "ending": {
+        const leftCurrentMilestone = left.milestones[Number(left.contract.currentMilestone)]?.contract;
+        const rightCurrentMilestone = right.milestones[Number(right.contract.currentMilestone)]?.contract;
+        const leftTarget =
+          Number(left.contract.status) === 0
+            ? left.contract.fundraisingDeadline
+            : leftCurrentMilestone?.dueDate ?? left.contract.fundraisingDeadline;
+        const rightTarget =
+          Number(right.contract.status) === 0
+            ? right.contract.fundraisingDeadline
+            : rightCurrentMilestone?.dueDate ?? right.contract.fundraisingDeadline;
+        return Number(leftTarget - rightTarget);
+      }
+      case "latest":
+      default:
+        return Number(right.contract.createdAt - left.contract.createdAt);
+    }
+  });
+  const totalPages = Math.max(1, Math.ceil(sortedCampaigns.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedCampaigns = filteredCampaigns.slice(
+  const paginatedCampaigns = sortedCampaigns.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
@@ -114,10 +145,38 @@ export function DashboardShell() {
   const totalRaised = campaigns.reduce((sum, campaign) => sum + campaign.contract.totalRaised, 0n);
   const activeCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 2).length;
   const fundraisingCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 0).length;
+  const completedCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 3).length;
+  const statusCounts = {
+    all: campaigns.length,
+    fundraising: fundraisingCampaigns,
+    active: activeCampaigns,
+    completed: completedCampaigns,
+    failed: campaigns.filter((campaign) => Number(campaign.contract.status) === 1).length,
+  };
+  const completionRate = campaigns.length ? Math.round((completedCampaigns / campaigns.length) * 100) : 0;
+  const spotlightCampaign =
+    [...campaigns].sort((left, right) => Number(right.contract.totalRaised - left.contract.totalRaised))[0] ?? null;
+  const deadlineCampaign =
+    [...campaigns]
+      .filter((campaign) => Number(campaign.contract.status) === 0 || Number(campaign.contract.status) === 2)
+      .sort((left, right) => {
+        const leftMilestone = left.milestones[Number(left.contract.currentMilestone)]?.contract;
+        const rightMilestone = right.milestones[Number(right.contract.currentMilestone)]?.contract;
+        const leftTarget =
+          Number(left.contract.status) === 0
+            ? left.contract.fundraisingDeadline
+            : leftMilestone?.dueDate ?? left.contract.fundraisingDeadline;
+        const rightTarget =
+          Number(right.contract.status) === 0
+            ? right.contract.fundraisingDeadline
+            : rightMilestone?.dueDate ?? right.contract.fundraisingDeadline;
+        return Number(leftTarget - rightTarget);
+      })[0] ?? null;
+  const featuredCampaigns = sortedCampaigns.slice(0, 3);
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, sortBy, statusFilter]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -131,13 +190,19 @@ export function DashboardShell() {
 
       <section className="dashboard-hero-card">
         <div className="dashboard-hero-copy">
-          <p className="eyebrow">Crowdfunding execution surface</p>
-          <h1>Ship campaigns with escrow, milestone voting, and refund logic in one flow.</h1>
+          <p className="eyebrow">On-chain campaign studio</p>
+          <h1>Launch, monitor, and settle milestone campaigns with a cleaner operator flow.</h1>
           <p className="hero-text">
-            This interface keeps the contract state legible for creators and backers without hiding
-            the actual trust boundary. Browse live campaigns, inspect their current milestone, or
-            launch a new one from the same surface.
+            The layout keeps the contract state readable for creators and backers without burying
+            the trust boundary. Browse live campaigns, sort by urgency or progress, and move into
+            the creation flow without leaving the same surface.
           </p>
+
+          <div className="hero-pill-row">
+            <span className="hero-pill">Escrow enforced on-chain</span>
+            <span className="hero-pill">IPFS-backed evidence bundles</span>
+            <span className="hero-pill">Weighted quorum voting</span>
+          </div>
 
           <div className="hero-inline-stats">
             <article className="hero-stat-card">
@@ -156,26 +221,80 @@ export function DashboardShell() {
               <span className="field-label">Escrowed</span>
               <strong>{formatEth(totalRaised, 2)}</strong>
             </article>
+            <article className="hero-stat-card">
+              <span className="field-label">Completed</span>
+              <strong>{completionRate}%</strong>
+            </article>
           </div>
         </div>
 
         <aside className="hero-right-rail">
-          <div className="rail-card">
+          <div className="hero-signal-card">
             <span className="field-label">Current network</span>
-            <strong>Chain {chainId}</strong>
-            <p className="muted-text">
-              The dashboard reads contract state directly from the selected chain and refreshes
-              after each confirmed write.
-            </p>
+            <strong>{surface === "browse" ? "Campaign directory" : "Creator studio"}</strong>
+            <div className="hero-signal-grid">
+              <article className="mini-card">
+                <span className="field-label">Chain</span>
+                <strong>{chainId}</strong>
+              </article>
+              <article className="mini-card">
+                <span className="field-label">Refresh mode</span>
+                <strong>{isRefreshing ? "Syncing" : "Live"}</strong>
+              </article>
+            </div>
+
+            {deadlineCampaign ? (
+              <div className="hero-inline-note">
+                <span className="field-label">Next contract checkpoint</span>
+                <strong>{deadlineCampaign.metadata?.title ?? `Campaign #${deadlineCampaign.id.toString()}`}</strong>
+                <p className="muted-text">
+                  {formatTimeRemaining(
+                    Number(deadlineCampaign.contract.status) === 0
+                      ? deadlineCampaign.contract.fundraisingDeadline
+                      : deadlineCampaign.milestones[Number(deadlineCampaign.contract.currentMilestone)]?.contract
+                          ?.dueDate,
+                  )}
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="rail-card">
-            <span className="field-label">How settlement works</span>
-            <ul className="compact-list">
-              {browseHighlights.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+          <div className="hero-signal-card">
+            <div className="surface-header surface-header-compact">
+              <div>
+                <span className="field-label">Product snapshot</span>
+                <strong>{spotlightCampaign?.metadata?.title ?? "No campaigns yet"}</strong>
+              </div>
+              <span className="status-pill status-active">Live data</span>
+            </div>
+
+            {spotlightCampaign ? (
+              <div className="hero-feature-list">
+                <article className="mini-card">
+                  <span className="field-label">Most funded</span>
+                  <strong>{formatEth(spotlightCampaign.contract.totalRaised, 2)}</strong>
+                  <p className="muted-text">
+                    {spotlightCampaign.metadata?.summary ??
+                      "Top campaign by escrowed value from the current network."}
+                  </p>
+                </article>
+                {featuredCampaigns.map((item) => (
+                  <article className="hero-feature-item" key={item.id.toString()}>
+                    <div>
+                      <span className="field-label">{getCampaignStatusLabel(item.contract.status)}</span>
+                      <strong>{item.metadata?.title ?? `Campaign #${item.id.toString()}`}</strong>
+                    </div>
+                    <span className="mono-note">{formatEth(item.contract.totalRaised, 2)}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <ul className="compact-list">
+                {browseHighlights.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
           </div>
         </aside>
       </section>
@@ -191,9 +310,12 @@ export function DashboardShell() {
               onPageChange={setPage}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              statusCounts={statusCounts}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
-              totalItems={filteredCampaigns.length}
+              totalItems={sortedCampaigns.length}
               totalPages={totalPages}
             />
           </section>
@@ -203,8 +325,31 @@ export function DashboardShell() {
               actionHelper="Switch into the creator flow without leaving the dashboard."
               actionLabel="Start a new campaign"
               campaignCount={campaigns.length}
+              highlightTitle={
+                deadlineCampaign?.metadata?.title ?? "Publish a new campaign with a cleaner draft flow."
+              }
+              highlightValue={
+                deadlineCampaign
+                  ? formatTimeRemaining(
+                      Number(deadlineCampaign.contract.status) === 0
+                        ? deadlineCampaign.contract.fundraisingDeadline
+                        : deadlineCampaign.milestones[Number(deadlineCampaign.contract.currentMilestone)]?.contract
+                            ?.dueDate,
+                    )
+                  : "Ready"
+              }
               onActionClick={() => setSurface("create")}
             />
+
+            <section className="side-note-card">
+              <p className="eyebrow">Browse heuristics</p>
+              <h2>Use filters, sorting, and direct campaign cards to reduce scanning time.</h2>
+              <ul className="compact-list">
+                <li>Sort by urgency to see campaigns that need the next operator step soonest.</li>
+                <li>Switch to progress view to compare how close fundraising campaigns are to activation.</li>
+                <li>Open a card to vote, execute milestones, withdraw, or claim refunds from one detail rail.</li>
+              </ul>
+            </section>
           </aside>
         </div>
       ) : (
@@ -226,6 +371,8 @@ export function DashboardShell() {
               actionHelper="Return to the campaign directory after reviewing your draft."
               actionLabel="Back to campaign list"
               campaignCount={campaigns.length}
+              highlightTitle="Draft flow"
+              highlightValue="Live preview"
               onActionClick={() => setSurface("browse")}
             />
 

@@ -71,6 +71,41 @@ export function CampaignCreateForm({
 
     return !Number.isNaN(currentDue) && !Number.isNaN(previousDue) && currentDue > previousDue;
   });
+  const draftLinks = parseLinks(externalLinks);
+  const readinessChecks = [
+    title.trim().length > 2,
+    summary.trim().length > 12,
+    description.trim().length > 48,
+    numericGoal > 0,
+    fundraisingDeadline.length > 0,
+    milestones.every(
+      (milestone) =>
+        milestone.title.trim().length > 2 &&
+        milestone.description.trim().length > 8 &&
+        milestone.amount.trim().length > 0 &&
+        milestone.dueDate.length > 0,
+    ),
+    allocationMatchesGoal,
+    hasAscendingSchedule,
+  ];
+  const readinessScore = Math.round(
+    (readinessChecks.filter(Boolean).length / readinessChecks.length) * 100,
+  );
+  const readinessTone =
+    readinessScore >= 85 ? "summary-chip-ok" : readinessScore >= 55 ? "summary-chip-warn" : "";
+  const nextDraftGap = !title.trim()
+    ? "Add a project title."
+    : !summary.trim()
+      ? "Add a one-line summary."
+      : !allocationMatchesGoal
+        ? "Adjust milestone amounts so they match the goal."
+        : !hasAscendingSchedule
+          ? "Fix milestone due dates so they stay strictly increasing."
+          : "Draft is structurally ready for publishing.";
+  const filledMilestones = milestones.filter(
+    (milestone) =>
+      milestone.title.trim() && milestone.description.trim() && milestone.amount.trim() && milestone.dueDate,
+  ).length;
 
   function updateMilestone(index: number, field: keyof MilestoneInput, value: string) {
     setMilestones((currentMilestones) =>
@@ -341,6 +376,53 @@ export function CampaignCreateForm({
                 onChange={(event) => setExternalLinks(event.target.value)}
               />
             </label>
+
+            <article className="creator-preview-card">
+              <div className="creator-preview-head">
+                <div>
+                  <p className="eyebrow">Live preview</p>
+                  <h3>{title.trim() || "Your campaign headline appears here."}</h3>
+                </div>
+                <span className={`status-pill ${readinessScore >= 85 ? "status-active" : "status-fundraising"}`}>
+                  {readinessScore}% ready
+                </span>
+              </div>
+
+              <p className="muted-text">
+                {summary.trim() ||
+                  "A short summary helps backers understand what is being funded before they open the full detail page."}
+              </p>
+
+              <div className="creator-readiness-bar">
+                <span style={{ width: `${readinessScore}%` }} />
+              </div>
+
+              <div className="creator-preview-grid">
+                <article className={`summary-chip ${goal.trim() ? "summary-chip-ok" : ""}`}>
+                  <span className="field-label">Goal</span>
+                  <strong>{goal.trim() ? `${goal} ETH` : "Unset"}</strong>
+                </article>
+                <article className={`summary-chip ${readinessTone}`}>
+                  <span className="field-label">Milestones</span>
+                  <strong>
+                    {filledMilestones} / {milestones.length} ready
+                  </strong>
+                </article>
+                <article className={`summary-chip ${fundraisingDeadline ? "summary-chip-ok" : ""}`}>
+                  <span className="field-label">Deadline</span>
+                  <strong>{fundraisingDeadline ? "Scheduled" : "Unset"}</strong>
+                </article>
+                <article className={`summary-chip ${draftLinks.length ? "summary-chip-ok" : ""}`}>
+                  <span className="field-label">Links</span>
+                  <strong>{draftLinks.length}</strong>
+                </article>
+              </div>
+
+              <div className="creator-preview-note">
+                <span className="field-label">Next improvement</span>
+                <p className="muted-text">{nextDraftGap}</p>
+              </div>
+            </article>
           </aside>
         </div>
 

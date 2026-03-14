@@ -18,6 +18,10 @@ export function WalletToolbar() {
       <div className="wallet-toolbar-meta">
         <span className="toolbar-label">Network</span>
         <strong>{chainLabels[chainId] ?? `Chain ${chainId}`}</strong>
+        <span className="toolbar-status">
+          <span className={`toolbar-status-dot ${isConnected ? "toolbar-status-dot-live" : ""}`} />
+          {isConnected ? "Wallet ready" : "Read only"}
+        </span>
       </div>
 
       <div className="wallet-toolbar-switcher">
@@ -40,9 +44,11 @@ export function WalletToolbar() {
       </div>
 
       {isConnected ? (
-        <button className="wallet-cta wallet-cta-connected" onClick={() => disconnect()} type="button">
-          {shortAddress(address)}
-        </button>
+        <div className="wallet-toolbar-actions">
+          <button className="wallet-cta wallet-cta-connected" onClick={() => disconnect()} type="button">
+            {shortAddress(address)}
+          </button>
+        </div>
       ) : (
         connectors.slice(0, 1).map((connector) => (
           <button

@@ -9,6 +9,8 @@ type WalletPanelProps = {
   campaignCount: number;
   actionLabel: string;
   actionHelper: string;
+  highlightTitle: string;
+  highlightValue: string;
   onActionClick: () => void;
 };
 
@@ -16,6 +18,8 @@ export function WalletPanel({
   campaignCount,
   actionLabel,
   actionHelper,
+  highlightTitle,
+  highlightValue,
   onActionClick,
 }: WalletPanelProps) {
   const { address, isConnected } = useAccount();
@@ -53,12 +57,26 @@ export function WalletPanel({
         </article>
       </div>
 
+      <div className="wallet-panel-highlight">
+        <div>
+          <span className="field-label">Current focus</span>
+          <strong>{highlightTitle}</strong>
+        </div>
+        <span className="status-pill status-active">{highlightValue}</span>
+      </div>
+
       <div className="wallet-panel-story">
         <p className="muted-text">
           Create flows pin content to IPFS first, then write only the CID and milestone rules to
           the chain. Backers interact with the same contract state you see here.
         </p>
       </div>
+
+      <ul className="compact-list compact-list-tight">
+        <li>Wallet and chain remain visible while you browse and write contract actions.</li>
+        <li>Creator flows surface before deployment errors reach the contract transaction step.</li>
+        <li>Detail pages keep payouts, refunds, and voting actions grouped by state.</li>
+      </ul>
 
       <button className="button wallet-panel-action" onClick={onActionClick} type="button">
         {actionLabel}
