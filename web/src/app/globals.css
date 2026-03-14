@@ -1,0 +1,438 @@
+:root {
+  --bg: #f4efe4;
+  --paper: rgba(255, 250, 241, 0.86);
+  --ink: #1f2f32;
+  --muted: #5d6861;
+  --line: rgba(31, 47, 50, 0.12);
+  --accent: #bc6540;
+  --accent-soft: #f3d0c0;
+  --teal: #0f7b6c;
+  --shadow: 0 24px 60px rgba(43, 33, 12, 0.12);
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(188, 101, 64, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(15, 123, 108, 0.16), transparent 24%),
+    linear-gradient(180deg, #f7f2e7 0%, #f0e8db 50%, #ece4d8 100%);
+  font-family: var(--font-display), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+.dashboard-shell,
+.detail-shell {
+  width: min(1400px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.hero,
+.detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 28px;
+}
+
+.hero-copy,
+.hero-metrics,
+.wallet-panel,
+.form-panel,
+.campaign-list,
+.detail-card,
+.detail-cover {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.hero-copy,
+.detail-copy,
+.wallet-panel,
+.form-panel,
+.campaign-list,
+.detail-card {
+  padding: 28px;
+}
+
+.hero-copy h1,
+.detail-copy h1 {
+  font-size: clamp(2.5rem, 5vw, 4.6rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  max-width: 12ch;
+}
+
+.hero-text,
+.muted-text {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.hero-text {
+  margin-top: 18px;
+  max-width: 62ch;
+}
+
+.hero-metrics {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.metric-card,
+.campaign-stats,
+.campaign-footer,
+.detail-stats,
+.milestone-facts {
+  display: grid;
+  gap: 14px;
+}
+
+.metric-card {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(188, 101, 64, 0.16);
+}
+
+.metric-card strong {
+  font-size: 1.5rem;
+}
+
+.dashboard-grid,
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.sidebar-stack,
+.detail-main,
+.detail-sidebar,
+.action-stack,
+.campaign-form,
+.milestone-editor-list,
+.activity-list {
+  display: grid;
+  gap: 18px;
+}
+
+.section-heading,
+.subsection-header,
+.campaign-card-header,
+.milestone-card-header,
+.milestone-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-heading h2,
+.wallet-panel h2,
+.form-panel h2,
+.detail-card h2 {
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.eyebrow,
+.field-label,
+.pill {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow,
+.field-label {
+  color: var(--muted);
+}
+
+.search-field,
+.campaign-form label,
+.action-box label {
+  display: grid;
+  gap: 8px;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(31, 47, 50, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+input:focus,
+textarea:focus {
+  border-color: rgba(188, 101, 64, 0.5);
+  box-shadow: 0 0 0 4px rgba(188, 101, 64, 0.12);
+}
+
+.button,
+.inline-link {
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.button {
+  border: none;
+  border-radius: 999px;
+  padding: 13px 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent), #d18452);
+  color: #fff8f1;
+}
+
+.button:hover,
+.inline-link:hover {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button-secondary {
+  background: rgba(15, 123, 108, 0.1);
+  color: var(--teal);
+  border: 1px solid rgba(15, 123, 108, 0.16);
+}
+
+.inline-link {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.wallet-summary,
+.wallet-actions,
+.form-two-up,
+.detail-stats,
+.button-row,
+.proof-files,
+.campaign-grid,
+.milestone-list {
+  display: grid;
+  gap: 14px;
+}
+
+.wallet-summary,
+.form-two-up,
+.detail-stats,
+.milestone-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wallet-actions,
+.button-row,
+.proof-files {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.campaign-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.campaign-card,
+.action-box,
+.milestone-card,
+.milestone-editor,
+.activity-item {
+  border: 1px solid rgba(31, 47, 50, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 20px;
+}
+
+.campaign-card h3,
+.milestone-card h3 {
+  font-size: 1.22rem;
+  margin: 10px 0;
+}
+
+.campaign-stats,
+.campaign-footer {
+  margin-top: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.progress-track {
+  height: 9px;
+  margin-top: 16px;
+  border-radius: 999px;
+  background: rgba(31, 47, 50, 0.08);
+  overflow: hidden;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--teal), var(--accent));
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 123, 108, 0.1);
+  color: var(--teal);
+}
+
+.detail-cover {
+  min-height: 340px;
+  position: relative;
+  overflow: hidden;
+}
+
+.detail-cover img {
+  object-fit: cover;
+}
+
+.proof-box {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(15, 123, 108, 0.06);
+}
+
+.feedback {
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(15, 123, 108, 0.08);
+  color: var(--teal);
+}
+
+.feedback-error {
+  background: rgba(188, 101, 64, 0.12);
+  color: #9e4521;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.activity-meta {
+  min-width: 140px;
+  text-align: right;
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 1080px) {
+  .hero,
+  .detail-hero,
+  .dashboard-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-cover {
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-shell,
+  .detail-shell {
+    width: min(100vw - 20px, 100%);
+    padding: 20px 0 36px;
+  }
+
+  .hero-copy,
+  .detail-copy,
+  .wallet-panel,
+  .form-panel,
+  .campaign-list,
+  .detail-card,
+  .detail-cover {
+    padding: 22px;
+  }
+
+  .hero-copy h1,
+  .detail-copy h1 {
+    font-size: 2.4rem;
+  }
+
+  .wallet-summary,
+  .wallet-actions,
+  .form-two-up,
+  .campaign-stats,
+  .campaign-footer,
+  .detail-stats,
+  .button-row,
+  .proof-files,
+  .milestone-facts,
+  .activity-item {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading,
+  .subsection-header,
+  .campaign-card-header,
+  .milestone-card-header,
+  .milestone-editor-header {
+    flex-direction: column;
+  }
+
+  .activity-item {
+    display: grid;
+  }
+
+  .activity-meta {
+    text-align: left;
+  }
+}
