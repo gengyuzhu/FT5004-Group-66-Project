@@ -1,6 +1,20 @@
 # MilestoneVault UML Diagrams
 
-## 1. Domain Class Diagram
+This document keeps both the rendered UML PNG assets used by `README.md` and the Mermaid source diagrams used during design.
+
+## Rendered UML Images
+
+### 1. Domain Model
+
+![MilestoneVault Domain Model](./assets/uml-domain-model.png)
+
+### 2. Milestone Approval Sequence
+
+![Milestone Approval Sequence](./assets/uml-milestone-sequence.png)
+
+## Mermaid Source
+
+### 1. Domain Class Diagram
 
 ```mermaid
 classDiagram
@@ -59,7 +73,7 @@ classDiagram
     MilestoneVault --> Milestone : enforces
 ```
 
-## 2. Funding And Activation Sequence
+### 2. Funding And Activation Sequence
 
 ```mermaid
 sequenceDiagram
@@ -79,7 +93,7 @@ sequenceDiagram
     Vault-->>Frontend: status = Active
 ```
 
-## 3. Milestone Approval Sequence
+### 3. Milestone Approval Sequence
 
 ```mermaid
 sequenceDiagram
@@ -106,7 +120,7 @@ sequenceDiagram
     end
 ```
 
-## 4. State Diagram
+### 4. State Diagram
 
 ```mermaid
 stateDiagram-v2
@@ -121,7 +135,7 @@ stateDiagram-v2
     Completed --> [*]
 ```
 
-## 5. Component Diagram
+### 5. Component Diagram
 
 ```mermaid
 flowchart LR
