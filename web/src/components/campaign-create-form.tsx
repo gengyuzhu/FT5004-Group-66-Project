@@ -11,6 +11,7 @@ import { parseDateTimeInput, parseLinks } from "@/lib/utils";
 type CampaignCreateFormProps = {
   chainId: number;
   onCreated: () => void;
+  onCancel: () => void;
   isRefreshing: boolean;
 };
 
@@ -29,6 +30,7 @@ const initialMilestones = [
 export function CampaignCreateForm({
   chainId,
   onCreated,
+  onCancel,
   isRefreshing,
 }: CampaignCreateFormProps) {
   const contractAddress = getMilestoneVaultAddress(chainId);
@@ -46,6 +48,7 @@ export function CampaignCreateForm({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const numericGoal = Number.parseFloat(goal || "0");
   const milestoneDraftTotal = milestones.reduce(
     (sum, milestone) => sum + (Number.parseFloat(milestone.amount || "0") || 0),
@@ -53,6 +56,21 @@ export function CampaignCreateForm({
   );
   const remainingAllocation = numericGoal - milestoneDraftTotal;
   const allocationMatchesGoal = goal.trim() !== "" && Math.abs(remainingAllocation) < 0.000001;
+
+  const parsedFundraisingDeadline = fundraisingDeadline ? Date.parse(fundraisingDeadline) : Number.NaN;
+  const hasAscendingSchedule = milestones.every((milestone, index) => {
+    if (!milestone.dueDate) {
+      return true;
+    }
+
+    const currentDue = Date.parse(milestone.dueDate);
+    const previousDue =
+      index === 0
+        ? parsedFundraisingDeadline
+        : Date.parse(milestones[index - 1]?.dueDate ?? milestones[index].dueDate);
+
+    return !Number.isNaN(currentDue) && !Number.isNaN(previousDue) && currentDue > previousDue;
+  });
 
   function updateMilestone(index: number, field: keyof MilestoneInput, value: string) {
     setMilestones((currentMilestones) =>
@@ -82,6 +100,17 @@ export function CampaignCreateForm({
     );
   }
 
+  function resetForm() {
+    setTitle("");
+    setSummary("");
+    setDescription("");
+    setGoal("");
+    setFundraisingDeadline("");
+    setExternalLinks("");
+    setMilestones(initialMilestones);
+    setCoverImage(null);
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -92,6 +121,16 @@ export function CampaignCreateForm({
 
     if (!contractAddress || !publicClient) {
       setError("No contract deployment is configured for this network yet.");
+      return;
+    }
+
+    if (!allocationMatchesGoal) {
+      setError("Milestone amounts must sum exactly to the campaign goal.");
+      return;
+    }
+
+    if (!hasAscendingSchedule) {
+      setError("Milestone due dates must be strictly later than the fundraising deadline and each prior milestone.");
       return;
     }
 
@@ -165,15 +204,8 @@ export function CampaignCreateForm({
       setFeedback("Waiting for confirmation...");
       await publicClient.waitForTransactionReceipt({ hash });
 
-      setTitle("");
-      setSummary("");
-      setDescription("");
-      setGoal("");
-      setFundraisingDeadline("");
-      setExternalLinks("");
-      setMilestones(initialMilestones);
-      setCoverImage(null);
-      setFeedback("Campaign created and indexed from the contract.");
+      resetForm();
+      setFeedback("Campaign created and now visible in the directory.");
       onCreated();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create campaign.");
@@ -185,117 +217,166 @@ export function CampaignCreateForm({
 
   return (
     <section className="form-panel">
-      <div className="section-heading">
+      <div className="form-header">
         <div>
-          <p className="eyebrow">Create Campaign</p>
-          <h2>Bundle metadata off-chain, enforce the rules on-chain.</h2>
+          <p className="eyebrow">Creator Studio</p>
+          <h2>Draft the campaign once, then let the contract enforce the release schedule.</h2>
+          <p className="muted-text">
+            Metadata and cover art stay off-chain in IPFS. Only the campaign goal, milestone due
+            dates, and the metadata CID are written to the contract.
+          </p>
+        </div>
+
+        <div className="form-header-actions">
+          <button className="button button-ghost" onClick={onCancel} type="button">
+            Cancel
+          </button>
+          <button className="button" disabled={isSubmitting || isRefreshing} form="campaign-form" type="submit">
+            {isSubmitting ? "Creating..." : "Deploy campaign"}
+          </button>
         </div>
       </div>
 
-      <form className="campaign-form" onSubmit={handleSubmit}>
-        <label>
-          <span className="field-label">Title</span>
-          <input required value={title} onChange={(event) => setTitle(event.target.value)} />
-        </label>
+      <div className="draft-summary">
+        <article className={`summary-chip ${goal.trim() ? "summary-chip-ok" : ""}`}>
+          <span className="field-label">Target</span>
+          <strong>{goal.trim() ? `${goal} ETH` : "Pending"}</strong>
+        </article>
+        <article className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : "summary-chip-warn"}`}>
+          <span className="field-label">Milestone total</span>
+          <strong>{milestoneDraftTotal ? `${milestoneDraftTotal.toFixed(4)} ETH` : "0 ETH"}</strong>
+        </article>
+        <article className={`summary-chip ${hasAscendingSchedule ? "summary-chip-ok" : "summary-chip-warn"}`}>
+          <span className="field-label">Schedule health</span>
+          <strong>{hasAscendingSchedule ? "Ordered" : "Needs fixing"}</strong>
+        </article>
+        <article className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : "summary-chip-warn"}`}>
+          <span className="field-label">Remaining</span>
+          <strong>{goal.trim() ? `${remainingAllocation.toFixed(4)} ETH` : "Set goal first"}</strong>
+        </article>
+      </div>
 
-        <label>
-          <span className="field-label">Summary</span>
-          <textarea
-            required
-            rows={3}
-            value={summary}
-            onChange={(event) => setSummary(event.target.value)}
-          />
-        </label>
+      <form className="campaign-form" id="campaign-form" onSubmit={handleSubmit}>
+        <div className="form-layout">
+          <div className="form-main-column">
+            <label>
+              <span className="field-label">Project title</span>
+              <input
+                maxLength={90}
+                required
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
 
-        <label>
-          <span className="field-label">Description</span>
-          <textarea
-            required
-            rows={5}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
+            <label>
+              <span className="field-label">One-line summary</span>
+              <textarea
+                maxLength={220}
+                required
+                rows={3}
+                value={summary}
+                onChange={(event) => setSummary(event.target.value)}
+              />
+            </label>
 
-        <div className="form-two-up">
-          <label>
-            <span className="field-label">Goal (ETH)</span>
-            <input
-              required
-              inputMode="decimal"
-              value={goal}
-              onChange={(event) => setGoal(event.target.value)}
-            />
-          </label>
+            <label>
+              <span className="field-label">Project story</span>
+              <textarea
+                required
+                rows={7}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </label>
 
-          <label>
-            <span className="field-label">Fundraising deadline</span>
-            <input
-              required
-              type="datetime-local"
-              value={fundraisingDeadline}
-              onChange={(event) => setFundraisingDeadline(event.target.value)}
-            />
-          </label>
+            <div className="form-two-up">
+              <label>
+                <span className="field-label">Goal (ETH)</span>
+                <input
+                  required
+                  inputMode="decimal"
+                  placeholder="10"
+                  value={goal}
+                  onChange={(event) => setGoal(event.target.value)}
+                />
+              </label>
+
+              <label>
+                <span className="field-label">Fundraising deadline</span>
+                <input
+                  required
+                  type="datetime-local"
+                  value={fundraisingDeadline}
+                  onChange={(event) => setFundraisingDeadline(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+
+          <aside className="form-side-column">
+            <label>
+              <span className="field-label">Cover image</span>
+              <input
+                accept="image/*"
+                type="file"
+                onChange={(event) => setCoverImage(event.target.files?.[0] ?? null)}
+              />
+            </label>
+
+            <div className="side-note-card side-note-card-compact">
+              <p className="field-label">Pinned asset</p>
+              <strong>{coverImage?.name ?? "No file selected yet"}</strong>
+              <p className="muted-text">
+                The file uploads to IPFS first. The returned CID becomes part of the metadata JSON.
+              </p>
+            </div>
+
+            <label>
+              <span className="field-label">External links</span>
+              <textarea
+                placeholder="One link per line"
+                rows={5}
+                value={externalLinks}
+                onChange={(event) => setExternalLinks(event.target.value)}
+              />
+            </label>
+          </aside>
         </div>
-
-        <label>
-          <span className="field-label">External links</span>
-          <textarea
-            rows={3}
-            placeholder="One link per line"
-            value={externalLinks}
-            onChange={(event) => setExternalLinks(event.target.value)}
-          />
-        </label>
-
-        <label>
-          <span className="field-label">Cover image</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => setCoverImage(event.target.files?.[0] ?? null)}
-          />
-        </label>
 
         <div className="subsection-header">
           <div>
-            <span className="field-label">Milestones</span>
-            <p className="muted-text">Amounts must add up to the campaign goal and due dates must increase.</p>
+            <span className="field-label">Milestone breakdown</span>
+            <p className="muted-text">
+              Each milestone must have a unique due date and the full set must equal the campaign goal.
+            </p>
           </div>
           <button className="button button-secondary" onClick={addMilestone} type="button">
             Add milestone
           </button>
         </div>
 
-        <div className="draft-summary">
-          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : ""}`}>
-            <span className="field-label">Goal</span>
-            <strong>{goal.trim() ? `${goal} ETH` : "Not set"}</strong>
-          </div>
-          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : ""}`}>
-            <span className="field-label">Milestone total</span>
-            <strong>{milestoneDraftTotal ? `${milestoneDraftTotal.toFixed(4)} ETH` : "0 ETH"}</strong>
-          </div>
-          <div className={`summary-chip ${allocationMatchesGoal ? "summary-chip-ok" : "summary-chip-warn"}`}>
-            <span className="field-label">Remaining allocation</span>
-            <strong>{goal.trim() ? `${remainingAllocation.toFixed(4)} ETH` : "Set goal first"}</strong>
-          </div>
-        </div>
-
         <div className="milestone-editor-list">
           {milestones.map((milestone, index) => (
             <article className="milestone-editor" key={`${index}-${milestone.title}`}>
               <div className="milestone-editor-header">
-                <strong>Milestone {index + 1}</strong>
-                <button className="inline-link" onClick={() => removeMilestone(index)} type="button">
+                <div className="milestone-chip">
+                  <span className="milestone-index">{index + 1}</span>
+                  <strong>{milestone.title || `Milestone ${index + 1}`}</strong>
+                </div>
+
+                <button
+                  className="button button-ghost button-small"
+                  disabled={milestones.length === 1}
+                  onClick={() => removeMilestone(index)}
+                  type="button"
+                >
                   Remove
                 </button>
               </div>
 
               <label>
-                <span className="field-label">Title</span>
+                <span className="field-label">Milestone title</span>
                 <input
                   required
                   value={milestone.title}
@@ -304,7 +385,7 @@ export function CampaignCreateForm({
               </label>
 
               <label>
-                <span className="field-label">Description</span>
+                <span className="field-label">Proof expectation</span>
                 <textarea
                   required
                   rows={3}
@@ -337,10 +418,6 @@ export function CampaignCreateForm({
             </article>
           ))}
         </div>
-
-        <button className="button" disabled={isSubmitting || isRefreshing} type="submit">
-          {isSubmitting ? "Creating..." : "Create campaign"}
-        </button>
       </form>
 
       {feedback ? <p className="feedback">{feedback}</p> : null}

@@ -9,7 +9,7 @@ MilestoneVault is a milestone-based crowdfunding DApp that shifts project fundin
 - Real DApp code: [`web/`](./web)
 - Static showcase for GitHub Pages: [`docs/`](./docs)
 
-The `web/` app is the real Next.js DApp with wallet actions and contract calls. The `docs/` folder contains a static, interactive GitHub Pages showcase so the repository itself can present a web-style product experience on GitHub.
+The `web/` app is the real Next.js DApp with wallet actions and contract calls. The `docs/` folder contains a static, interactive GitHub Pages showcase with the same visual direction, so the repository itself can present a web-style product experience on GitHub without the old documentation-heavy top navigation.
 
 ## Core MVP Scope
 
@@ -122,6 +122,11 @@ milestone-vault/
 |   |-- src/
 |   |   |-- app/
 |   |   |-- components/
+|   |   |   |-- dashboard-shell.tsx
+|   |   |   |-- campaign-detail-client.tsx
+|   |   |   |-- campaign-create-form.tsx
+|   |   |   |-- app-topbar.tsx
+|   |   |   |-- wallet-toolbar.tsx
 |   |   |-- lib/
 |   |-- package.json
 |-- .gitignore
@@ -145,16 +150,17 @@ milestone-vault/
 
 | Test Suite | Tests | Status |
 | --- | ---: | --- |
-| `createCampaign` | 6 | [OK] All passing |
+| `createCampaign` | 8 | [OK] All passing |
 | `contribute` | 4 | [OK] All passing |
 | `finalizeCampaign` | 3 | [OK] All passing |
-| `submitMilestoneProof` | 3 | [OK] All passing |
+| `submitMilestoneProof` | 4 | [OK] All passing |
 | `voteOnMilestone` | 5 | [OK] All passing |
 | `executeMilestone` | 5 | [OK] All passing |
 | `withdrawCreatorFunds` | 2 | [OK] All passing |
 | `claimRefund` | 4 | [OK] All passing |
+| `failCampaignForMissedDeadline` | 2 | [OK] All passing |
 | `View functions` | 2 | [OK] All passing |
-| **Total** | **34** | **[OK] All passing** |
+| **Total** | **39** | **[OK] All passing** |
 
 Verified locally with:
 
@@ -167,12 +173,19 @@ cd web && npm run build
 ## What The Frontend Covers
 
 - Wallet connect and network switch
-- Campaign creation with milestone drafting
-- Campaign discovery dashboard with search
-- Campaign detail page with contribution, proof, vote, execute, withdraw, and refund actions
+- Campaign creation with milestone drafting and client-side schedule validation
+- Campaign discovery dashboard with search, status filters, and a compact product-style topbar
+- Campaign detail page with overview, milestones, and activity tabs
+- Contribution, proof, vote, execute, withdraw, and refund actions from a persistent action rail
 - IPFS upload routes for campaign metadata and milestone proof bundles
-- Responsive layouts for desktop and mobile widths
-- Static GitHub Pages interaction demo for repository showcase
+- Responsive layouts tuned for desktop and mobile widths
+- Static GitHub Pages interaction demo with the same design language as the real DApp
+
+## UI Direction
+
+- The main DApp now follows a darker, denser product layout inspired by the reference `App.jsx`, with smaller typography, clearer hierarchy, and less clutter in the header.
+- Dashboard, creator flow, campaign detail, and the repository demo now share the same brand system, card language, and mobile-first responsive behavior.
+- The GitHub Pages site intentionally avoids extra top-right document links; supporting docs remain available lower in the page and in the repository.
 
 ## Local Setup
 

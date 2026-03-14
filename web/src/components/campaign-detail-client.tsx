@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { parseEther } from "viem";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 
+import { AppTopbar } from "@/components/app-topbar";
 import { milestoneVaultAbi } from "@/lib/contracts/milestoneVault";
 import { defaultChainId } from "@/lib/config";
 import { getIpfsUrl } from "@/lib/ipfs";
@@ -26,9 +27,13 @@ import {
 import {
   compareAddresses,
   formatEth,
+  formatShortEth,
+  formatTimeRemaining,
   formatTimestamp,
+  getCampaignStatusAccent,
   getCampaignStatusLabel,
   getFailureReasonLabel,
+  getProgressPercentage,
   parseLinks,
   shortAddress,
 } from "@/lib/utils";
@@ -36,6 +41,10 @@ import {
 type CampaignDetailClientProps = {
   campaignId: string;
 };
+
+type DetailTab = "overview" | "milestones" | "activity";
+
+const detailTabs: DetailTab[] = ["overview", "milestones", "activity"];
 
 export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) {
   const { address, isConnected } = useAccount();
@@ -53,6 +62,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [isRefreshing, startTransition] = useTransition();
   const [contributionAmount, setContributionAmount] = useState("");
   const [proofSummary, setProofSummary] = useState("");
@@ -174,7 +184,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   }
 
   async function handleContribute() {
-    if (!campaign || !campaignIdValue || !contractAddress) {
+    if (!campaignIdValue || !contractAddress || !contributionAmount) {
       return;
     }
 
@@ -312,7 +322,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
   }
 
   async function handleProofSubmission() {
-    if (!campaign || !campaignIdValue || !contractAddress) {
+    if (!campaign || !campaignIdValue || !contractAddress || !proofSummary.trim()) {
+      setError("Add a short proof summary before opening voting.");
       return;
     }
 
@@ -369,43 +380,44 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     }
   }
 
-  if (!campaignIdValue) {
+  function renderShellMessage(message: string, errorState = false) {
     return (
       <main className="detail-shell">
-        <p className="feedback feedback-error">The campaign id must be a valid integer.</p>
+        <AppTopbar backHref="/" backLabel="Back to dashboard" />
+        <section className="detail-shell-message">
+          <div className={`detail-section-card ${errorState ? "detail-section-card-error" : ""}`}>
+            <p className={`feedback ${errorState ? "feedback-error" : ""}`}>{message}</p>
+          </div>
+        </section>
       </main>
     );
+  }
+
+  if (!campaignIdValue) {
+    return renderShellMessage("The campaign id must be a valid integer.", true);
   }
 
   if (!contractAddress) {
-    return (
-      <main className="detail-shell">
-        <p className="feedback feedback-error">
-          No MilestoneVault deployment is configured for the current chain.
-        </p>
-      </main>
-    );
+    return renderShellMessage("No MilestoneVault deployment is configured for the current chain.", true);
   }
 
   if (isLoading) {
-    return (
-      <main className="detail-shell">
-        <p className="feedback">Loading campaign detail from the chain...</p>
-      </main>
-    );
+    return renderShellMessage("Loading campaign detail from the chain...");
   }
 
   if (!campaign) {
-    return (
-      <main className="detail-shell">
-        <p className="feedback feedback-error">{error ?? "Campaign not found."}</p>
-      </main>
-    );
+    return renderShellMessage(error ?? "Campaign not found.", true);
   }
 
-  const currentMilestone = campaign.milestones[Number(campaign.contract.currentMilestone)] ?? null;
+  const currentMilestoneIndex = Number(campaign.contract.currentMilestone);
+  const currentMilestone = campaign.milestones[currentMilestoneIndex] ?? null;
   const isCreator = compareAddresses(address, campaign.contract.creator);
   const now = BigInt(Math.floor(Date.now() / 1000));
+  const fundingProgress = getProgressPercentage(campaign.contract.totalRaised, campaign.contract.goal);
+  const currentParticipation = currentMilestone
+    ? currentMilestone.contract.yesWeight + currentMilestone.contract.noWeight
+    : 0n;
+  const quorumTarget = campaign.contract.totalRaised / 5n;
   const canFinalize =
     Number(campaign.contract.status) === CampaignStatus.Fundraising &&
     now >= campaign.contract.fundraisingDeadline;
@@ -440,58 +452,62 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
     Number(campaign.contract.status) === CampaignStatus.Failed &&
     (backerState?.refundAmount ?? 0n) > 0n &&
     !backerState?.refundClaimed;
+  const currentRole = isCreator
+    ? "Creator"
+    : (backerState?.contributionAmount ?? 0n) > 0n
+      ? "Backer"
+      : "Observer";
+  const statusLabel = getCampaignStatusLabel(campaign.contract.status);
+  const statusAccent = getCampaignStatusAccent(campaign.contract.status);
 
   return (
     <main className="detail-shell">
-      <Link className="inline-link" href="/">
-        Back to dashboard
-      </Link>
+      <AppTopbar backHref="/" backLabel="Back to dashboard" />
 
-      <section className="detail-hero">
-        <div className="detail-copy">
-          <p className="eyebrow">
-            Campaign #{campaign.id.toString()} | {getCampaignStatusLabel(campaign.contract.status)}
-          </p>
+      <section className="detail-hero-card">
+        <div className="detail-hero-copy">
+          <div className="detail-hero-head">
+            <span className={`status-pill ${statusAccent}`}>{statusLabel}</span>
+            <span className="mono-note">Campaign #{campaign.id.toString()}</span>
+          </div>
+
           <h1>{campaign.metadata?.title ?? "Untitled campaign"}</h1>
           <p className="hero-text">
-            {campaign.metadata?.description ??
-              "Campaign metadata could not be resolved from IPFS, but the on-chain state is still available."}
+            {campaign.metadata?.summary ??
+              "Campaign metadata could not be resolved from IPFS, but the on-chain state remains readable."}
           </p>
 
-          <div className="detail-stats">
-            <div>
-              <span className="field-label">Creator</span>
-              <strong>{shortAddress(campaign.contract.creator)}</strong>
+          <div className="detail-progress-panel">
+            <div className="campaign-progress-copy">
+              <strong>{formatEth(campaign.contract.totalRaised, 2)}</strong>
+              <span>of {formatEth(campaign.contract.goal, 2)}</span>
             </div>
-            <div>
-              <span className="field-label">Raised</span>
-              <strong>{formatEth(campaign.contract.totalRaised)}</strong>
-            </div>
-            <div>
-              <span className="field-label">Goal</span>
-              <strong>{formatEth(campaign.contract.goal)}</strong>
-            </div>
-            <div>
-              <span className="field-label">Failure reason</span>
-              <strong>{getFailureReasonLabel(campaign.contract.failureReason)}</strong>
+            <div className="progress-track progress-track-dark" aria-hidden="true">
+              <span style={{ width: `${fundingProgress}%` }} />
             </div>
           </div>
 
-          {campaign.metadata?.externalLinks?.length ? (
-            <div className="link-cluster">
-              {campaign.metadata.externalLinks.map((externalLink) => (
-                <a
-                  className="inline-link"
-                  href={externalLink}
-                  key={externalLink}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {externalLink}
-                </a>
-              ))}
-            </div>
-          ) : null}
+          <div className="detail-kpis">
+            <article className="detail-kpi">
+              <span className="field-label">Creator</span>
+              <strong>{shortAddress(campaign.contract.creator)}</strong>
+            </article>
+            <article className="detail-kpi">
+              <span className="field-label">Role</span>
+              <strong>{currentRole}</strong>
+            </article>
+            <article className="detail-kpi">
+              <span className="field-label">Milestones</span>
+              <strong>
+                {Math.min(currentMilestoneIndex + 1, Number(campaign.contract.milestoneCount))} /{" "}
+                {Number(campaign.contract.milestoneCount)}
+              </strong>
+            </article>
+            <article className="detail-kpi">
+              <span className="field-label">Failure reason</span>
+              <strong>{getFailureReasonLabel(campaign.contract.failureReason)}</strong>
+            </article>
+          </div>
         </div>
 
         {campaign.metadata?.coverImageCid ? (
@@ -504,168 +520,356 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
               src={getIpfsUrl(campaign.metadata.coverImageCid) ?? ""}
             />
           </div>
-        ) : null}
+        ) : (
+          <div className="detail-cover detail-cover-fallback">
+            <div className="cover-fallback-copy">
+              <p className="eyebrow">On-chain brief</p>
+              <h2>Escrowed capital, milestone proof, weighted voting.</h2>
+              <p className="muted-text">
+                This campaign uses sequential milestone releases, creator pull-payments, and
+                refunds from unreleased escrow only.
+              </p>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="detail-strip">
         <article className="mini-card">
-          <span className="field-label">Milestone progress</span>
-          <strong>
-            {Math.min(Number(campaign.contract.currentMilestone) + 1, Number(campaign.contract.milestoneCount))} /{" "}
-            {Number(campaign.contract.milestoneCount)}
-          </strong>
-        </article>
-        <article className="mini-card">
           <span className="field-label">Approved payout</span>
           <strong>{formatEth(campaign.contract.approvedPayoutTotal)}</strong>
+        </article>
+        <article className="mini-card">
+          <span className="field-label">Creator withdrawn</span>
+          <strong>{formatEth(campaign.contract.creatorWithdrawn)}</strong>
         </article>
         <article className="mini-card">
           <span className="field-label">Refund pool</span>
           <strong>{formatEth(campaign.refundPool)}</strong>
         </article>
         <article className="mini-card">
-          <span className="field-label">Creator withdrawn</span>
-          <strong>{formatEth(campaign.contract.creatorWithdrawn)}</strong>
+          <span className="field-label">Current milestone due</span>
+          <strong>{currentMilestone ? formatTimeRemaining(currentMilestone.contract.dueDate) : "Completed"}</strong>
         </article>
       </section>
 
-      <div className="detail-grid">
-        <section className="detail-main">
-          <article className="detail-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Milestone Ledger</p>
-                <h2>Each release step is explicit, visible, and bounded by time.</h2>
-              </div>
-            </div>
+      <section className="detail-tabs">
+        {detailTabs.map((tab) => (
+          <button
+            key={tab}
+            className={`detail-tab ${activeTab === tab ? "detail-tab-active" : ""}`}
+            onClick={() => setActiveTab(tab)}
+            type="button"
+          >
+            {tab}
+          </button>
+        ))}
+      </section>
 
-            <div className="milestone-list">
-              {campaign.milestones.map((milestone) => (
-                <article className="milestone-card" key={milestone.id}>
-                  <div className="milestone-card-header">
-                    <div>
-                      <p className="eyebrow">Milestone {milestone.id + 1}</p>
-                      <h3>{milestone.metadata?.title ?? `Milestone ${milestone.id + 1}`}</h3>
-                    </div>
-                    <span className="pill">
-                      {milestone.contract.executed
-                        ? "Approved"
-                        : milestone.contract.proofCID
-                          ? "Voting"
-                          : milestone.id === Number(campaign.contract.currentMilestone)
-                            ? "Current"
-                            : "Queued"}
-                    </span>
+      <div className="detail-content-grid">
+        <section className="detail-primary">
+          {activeTab === "overview" ? (
+            <>
+              <article className="detail-section-card">
+                <div className="detail-section-header">
+                  <div>
+                    <p className="eyebrow">Project overview</p>
+                    <h2>What backers are funding and how settlement stays constrained.</h2>
+                  </div>
+                </div>
+
+                <div className="overview-grid">
+                  <div className="overview-panel">
+                    <span className="field-label">Description</span>
+                    <p className="muted-text">
+                      {campaign.metadata?.description ??
+                        "The off-chain campaign description is unavailable, but the campaign rules and balances remain visible on-chain."}
+                    </p>
                   </div>
 
-                  <p className="muted-text">
-                    {milestone.metadata?.description ?? "No milestone description available in metadata."}
-                  </p>
-
-                  <div className="milestone-facts">
-                    <div>
-                      <span className="field-label">Amount</span>
-                      <strong>{formatEth(milestone.contract.amount)}</strong>
-                    </div>
-                    <div>
-                      <span className="field-label">Due</span>
-                      <strong>{formatTimestamp(milestone.contract.dueDate)}</strong>
-                    </div>
-                    <div>
-                      <span className="field-label">Votes</span>
-                      <strong>
-                        {formatEth(milestone.contract.yesWeight)} YES / {formatEth(milestone.contract.noWeight)} NO
-                      </strong>
-                    </div>
+                  <div className="overview-panel">
+                    <span className="field-label">Rule snapshot</span>
+                    <ul className="compact-list">
+                      <li>Voting weight follows each backer&apos;s contribution size.</li>
+                      <li>Milestones execute strictly in order.</li>
+                      <li>Refunds cover only unreleased escrow, never approved payouts.</li>
+                      <li>Missed deadlines can be failed publicly if no proof was submitted.</li>
+                    </ul>
                   </div>
+                </div>
 
-                  {milestone.contract.proofCID ? (
-                    <div className="proof-box">
+                {campaign.metadata?.externalLinks?.length ? (
+                  <div className="link-cluster">
+                    {campaign.metadata.externalLinks.map((externalLink) => (
                       <a
                         className="inline-link"
-                        href={getIpfsUrl(milestone.contract.proofCID) ?? "#"}
+                        href={externalLink}
+                        key={externalLink}
                         rel="noreferrer"
                         target="_blank"
                       >
-                        Open proof JSON
+                        {externalLink}
                       </a>
-                      <p className="muted-text">
-                        {milestone.proof?.summary ?? "Proof bundle metadata is available at the stored CID."}
-                      </p>
-
-                      {milestone.proof?.demoLinks.length ? (
-                        <div className="proof-files">
-                          {milestone.proof.demoLinks.map((demoLink) => (
-                            <a className="inline-link" href={demoLink} key={demoLink} rel="noreferrer" target="_blank">
-                              Demo link
-                            </a>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {milestone.proof?.fileCids.length ? (
-                        <div className="proof-files">
-                          {milestone.proof.fileCids.map((file) => (
-                            <a
-                              className="inline-link"
-                              href={getIpfsUrl(file.cid) ?? "#"}
-                              key={`${file.cid}-${file.name}`}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              {file.name}
-                            </a>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          </article>
-
-          <article className="detail-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Activity Feed</p>
-                <h2>Recent on-chain actions for this campaign.</h2>
-              </div>
-            </div>
-
-            <div className="activity-list">
-              {activity.map((item) => (
-                <div className="activity-item" key={item.key}>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p className="muted-text">{item.detail}</p>
+                    ))}
                   </div>
-                  <div className="activity-meta">
-                    <span>{item.timestamp ? formatTimestamp(item.timestamp) : `Block ${item.blockNumber}`}</span>
-                    <span>{shortAddress(item.txHash)}</span>
+                ) : null}
+              </article>
+
+              <article className="detail-section-card">
+                <div className="detail-section-header">
+                  <div>
+                    <p className="eyebrow">Current contract state</p>
+                    <h2>The page is reading direct state, not a platform database mirror.</h2>
                   </div>
                 </div>
-              ))}
-            </div>
-          </article>
+
+                <div className="info-grid">
+                  <article className="info-card">
+                    <span className="field-label">Fundraising deadline</span>
+                    <strong>{formatTimestamp(campaign.contract.fundraisingDeadline)}</strong>
+                  </article>
+                  <article className="info-card">
+                    <span className="field-label">Campaign created</span>
+                    <strong>{formatTimestamp(campaign.contract.createdAt)}</strong>
+                  </article>
+                  <article className="info-card">
+                    <span className="field-label">Backer contribution</span>
+                    <strong>{formatEth(backerState?.contributionAmount ?? 0n)}</strong>
+                  </article>
+                  <article className="info-card">
+                    <span className="field-label">Backer refundable</span>
+                    <strong>{formatEth(backerState?.refundAmount ?? 0n)}</strong>
+                  </article>
+                </div>
+
+                {currentMilestone ? (
+                  <div className="current-milestone-banner">
+                    <div>
+                      <span className="field-label">Current milestone</span>
+                      <strong>
+                        {currentMilestone.metadata?.title ?? `Milestone ${currentMilestone.id + 1}`}
+                      </strong>
+                    </div>
+                    <p className="muted-text">
+                      Due {formatTimestamp(currentMilestone.contract.dueDate)}. Voting progress is{" "}
+                      {formatShortEth(currentParticipation)} / {formatShortEth(quorumTarget)} ETH toward quorum.
+                    </p>
+                  </div>
+                ) : null}
+              </article>
+            </>
+          ) : null}
+
+          {activeTab === "milestones" ? (
+            <article className="detail-section-card">
+              <div className="detail-section-header">
+                <div>
+                  <p className="eyebrow">Milestone ledger</p>
+                  <h2>Each tranche, vote window, and proof bundle is exposed as a separate step.</h2>
+                </div>
+              </div>
+
+              <div className="milestone-list">
+                {campaign.milestones.map((milestone) => {
+                  const voteTotal = milestone.contract.yesWeight + milestone.contract.noWeight;
+                  const voteProgress =
+                    campaign.contract.totalRaised > 0n
+                      ? getProgressPercentage(voteTotal, campaign.contract.totalRaised)
+                      : 0;
+                  const yesShare =
+                    voteTotal > 0n ? getProgressPercentage(milestone.contract.yesWeight, voteTotal) : 0;
+                  const noShare = voteTotal > 0n ? Math.max(100 - yesShare, 0) : 0;
+
+                  return (
+                    <article
+                      className={`milestone-card ${
+                        milestone.id === currentMilestoneIndex ? "milestone-card-active" : ""
+                      }`}
+                      key={milestone.id}
+                    >
+                      <div className="milestone-card-top">
+                        <div>
+                          <p className="eyebrow">Milestone {milestone.id + 1}</p>
+                          <h3>{milestone.metadata?.title ?? `Milestone ${milestone.id + 1}`}</h3>
+                        </div>
+                        <span
+                          className={`status-pill ${
+                            milestone.contract.executed
+                              ? "status-completed"
+                              : milestone.contract.proofCID
+                                ? "status-active"
+                                : milestone.id === currentMilestoneIndex
+                                  ? "status-fundraising"
+                                  : "status-default"
+                          }`}
+                        >
+                          {milestone.contract.executed
+                            ? "Approved"
+                            : milestone.contract.proofCID
+                              ? "Voting open"
+                              : milestone.id === currentMilestoneIndex
+                                ? "Current"
+                                : "Queued"}
+                        </span>
+                      </div>
+
+                      <p className="muted-text">
+                        {milestone.metadata?.description ?? "No milestone description available in metadata."}
+                      </p>
+
+                      <div className="info-grid">
+                        <article className="info-card">
+                          <span className="field-label">Amount</span>
+                          <strong>{formatEth(milestone.contract.amount)}</strong>
+                        </article>
+                        <article className="info-card">
+                          <span className="field-label">Due date</span>
+                          <strong>{formatTimestamp(milestone.contract.dueDate)}</strong>
+                        </article>
+                        <article className="info-card">
+                          <span className="field-label">Yes weight</span>
+                          <strong>{formatEth(milestone.contract.yesWeight)}</strong>
+                        </article>
+                        <article className="info-card">
+                          <span className="field-label">No weight</span>
+                          <strong>{formatEth(milestone.contract.noWeight)}</strong>
+                        </article>
+                      </div>
+
+                      <div className="vote-meter">
+                        <div className="vote-meter-head">
+                          <span className="field-label">Participation</span>
+                          <span className="mono-note">{voteProgress.toFixed(0)}% of total escrow</span>
+                        </div>
+                        <div className="progress-track progress-track-dark">
+                          <span style={{ width: `${voteProgress}%` }} />
+                        </div>
+                        <div className="vote-breakdown">
+                          <span>YES {yesShare.toFixed(0)}%</span>
+                          <span>NO {noShare.toFixed(0)}%</span>
+                        </div>
+                      </div>
+
+                      {milestone.contract.proofCID ? (
+                        <div className="proof-box">
+                          <a
+                            className="inline-link"
+                            href={getIpfsUrl(milestone.contract.proofCID) ?? "#"}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Open proof JSON
+                          </a>
+                          <p className="muted-text">
+                            {milestone.proof?.summary ?? "Proof bundle metadata is available at the stored CID."}
+                          </p>
+
+                          {milestone.proof?.demoLinks.length ? (
+                            <div className="proof-files">
+                              {milestone.proof.demoLinks.map((demoLink) => (
+                                <a
+                                  className="inline-link"
+                                  href={demoLink}
+                                  key={demoLink}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  Demo link
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {milestone.proof?.fileCids.length ? (
+                            <div className="proof-files">
+                              {milestone.proof.fileCids.map((file) => (
+                                <a
+                                  className="inline-link"
+                                  href={getIpfsUrl(file.cid) ?? "#"}
+                                  key={`${file.cid}-${file.name}`}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  {file.name}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            </article>
+          ) : null}
+
+          {activeTab === "activity" ? (
+            <>
+              <article className="detail-section-card">
+                <div className="detail-section-header">
+                  <div>
+                    <p className="eyebrow">Activity feed</p>
+                    <h2>Recent on-chain actions for this campaign.</h2>
+                  </div>
+                </div>
+
+                <div className="activity-list">
+                  {activity.length ? (
+                    activity.map((item) => (
+                      <div className="activity-item" key={item.key}>
+                        <div>
+                          <strong>{item.label}</strong>
+                          <p className="muted-text">{item.detail}</p>
+                        </div>
+                        <div className="activity-meta">
+                          <span>{item.timestamp ? formatTimestamp(item.timestamp) : `Block ${item.blockNumber}`}</span>
+                          <span>{shortAddress(item.txHash)}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="muted-text">No campaign events were found on this network yet.</p>
+                  )}
+                </div>
+              </article>
+
+              <article className="detail-section-card">
+                <div className="detail-section-header">
+                  <div>
+                    <p className="eyebrow">Operator notes</p>
+                    <h2>What still requires human coordination outside the chain.</h2>
+                  </div>
+                </div>
+
+                <ul className="compact-list">
+                  <li>Proof integrity is verifiable through IPFS CIDs, but truthfulness still needs voters.</li>
+                  <li>Low participation can still cause governance friction even with quorum.</li>
+                  <li>Weighted voting simplifies anti-sybil handling but favors larger backers.</li>
+                  <li>Refund math stays proportional to unreleased escrow, not the creator&apos;s withdrawn balance.</li>
+                </ul>
+              </article>
+            </>
+          ) : null}
         </section>
 
         <aside className="detail-sidebar">
-          <article className="detail-card action-card">
-            <div className="section-heading">
+          <article className="detail-section-card sticky-panel">
+            <div className="detail-section-header">
               <div>
-                <p className="eyebrow">Actions</p>
-                <h2>Context-aware contract calls.</h2>
+                <p className="eyebrow">Live actions</p>
+                <h2>Contract writes stay grouped by the current campaign state.</h2>
               </div>
             </div>
 
-            <div className="action-stack">
-              <div className="action-box">
-                <span className="field-label">Fundraising deadline</span>
+            <div className="action-grid">
+              <div className="action-card">
+                <span className="field-label">Fundraising</span>
                 <strong>{formatTimestamp(campaign.contract.fundraisingDeadline)}</strong>
                 <p className="muted-text">
-                  Backers can fund until the deadline. Anyone can finalize once the fundraising window closes.
+                  Backers can contribute until the deadline. Anyone can finalize the campaign after the window closes.
                 </p>
+
                 <label>
                   <span className="field-label">Contribute (ETH)</span>
                   <input
@@ -675,70 +879,72 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                     onChange={(event) => setContributionAmount(event.target.value)}
                   />
                 </label>
-                <button
-                  className="button"
-                  disabled={
-                    !isConnected ||
-                    isWorking ||
-                    Number(campaign.contract.status) !== CampaignStatus.Fundraising
-                  }
-                  onClick={() => void handleContribute()}
-                >
-                  Contribute
-                </button>
-                <button
-                  className="button button-secondary"
-                  disabled={!isConnected || isWorking || !canFinalize}
-                  onClick={() => void handleFinalize()}
-                >
-                  Finalize fundraising
-                </button>
+
+                <div className="button-row">
+                  <button
+                    className="button"
+                    disabled={
+                      !isConnected ||
+                      isWorking ||
+                      Number(campaign.contract.status) !== CampaignStatus.Fundraising
+                    }
+                    onClick={() => void handleContribute()}
+                    type="button"
+                  >
+                    Contribute
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    disabled={!isConnected || isWorking || !canFinalize}
+                    onClick={() => void handleFinalize()}
+                    type="button"
+                  >
+                    Finalize
+                  </button>
+                </div>
               </div>
 
-              <div className="action-box">
-                <span className="field-label">Creator withdrawable</span>
-                <strong>{formatEth(campaign.withdrawable)}</strong>
+              <div className="action-card">
+                <span className="field-label">Payout + refund</span>
+                <strong>{formatEth(campaign.withdrawable)} withdrawable</strong>
                 <p className="muted-text">
-                  Approved milestone tranches are paid out through the pull-payment withdraw pattern.
+                  Approved milestone tranches unlock creator withdrawals. Failed campaigns unlock proportional refunds.
                 </p>
-                <button
-                  className="button"
-                  disabled={!isConnected || isWorking || !canWithdraw}
-                  onClick={() => void handleWithdraw()}
-                >
-                  Withdraw approved funds
-                </button>
-              </div>
-
-              <div className="action-box">
-                <span className="field-label">Backer refund</span>
-                <strong>{formatEth(backerState?.refundAmount ?? 0n)}</strong>
-                <p className="muted-text">
-                  Refunds only draw from unreleased escrow after underfunding, rejection, or missed deadlines.
-                </p>
-                <button
-                  className="button"
-                  disabled={!isConnected || isWorking || !canRefund}
-                  onClick={() => void handleRefund()}
-                >
-                  Claim refund
-                </button>
+                <div className="button-row">
+                  <button
+                    className="button"
+                    disabled={!isConnected || isWorking || !canWithdraw}
+                    onClick={() => void handleWithdraw()}
+                    type="button"
+                  >
+                    Withdraw
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    disabled={!isConnected || isWorking || !canRefund}
+                    onClick={() => void handleRefund()}
+                    type="button"
+                  >
+                    Claim refund
+                  </button>
+                </div>
               </div>
 
               {currentMilestone ? (
-                <div className="action-box">
+                <div className="action-card">
                   <span className="field-label">Current milestone</span>
                   <strong>{currentMilestone.metadata?.title ?? `Milestone ${currentMilestone.id + 1}`}</strong>
                   <p className="muted-text">
-                    Due {formatTimestamp(currentMilestone.contract.dueDate)} | voting ends{" "}
+                    Due {formatTimestamp(currentMilestone.contract.dueDate)}. Voting window{" "}
                     {currentMilestone.contract.voteEnd
-                      ? formatTimestamp(currentMilestone.contract.voteEnd)
-                      : "after proof submission"}
+                      ? `ends ${formatTimestamp(currentMilestone.contract.voteEnd)}`
+                      : "opens after proof submission"}.
                   </p>
 
                   <label>
                     <span className="field-label">Proof summary</span>
                     <textarea
+                      placeholder="Summarize what changed in this milestone and what the evidence bundle contains."
                       rows={4}
                       value={proofSummary}
                       onChange={(event) => setProofSummary(event.target.value)}
@@ -748,8 +954,8 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                   <label>
                     <span className="field-label">Demo links</span>
                     <textarea
-                      rows={3}
                       placeholder="One link per line"
+                      rows={3}
                       value={proofLinks}
                       onChange={(event) => setProofLinks(event.target.value)}
                     />
@@ -768,8 +974,9 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                     className="button"
                     disabled={!isConnected || isWorking || !canSubmitProof}
                     onClick={() => void handleProofSubmission()}
+                    type="button"
                   >
-                    Submit proof + open voting
+                    Submit proof
                   </button>
 
                   <div className="button-row">
@@ -777,6 +984,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       className="button button-secondary"
                       disabled={!canVote || isWorking}
                       onClick={() => void handleVote(true)}
+                      type="button"
                     >
                       Vote YES
                     </button>
@@ -784,6 +992,7 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                       className="button button-secondary"
                       disabled={!canVote || isWorking}
                       onClick={() => void handleVote(false)}
+                      type="button"
                     >
                       Vote NO
                     </button>
@@ -795,21 +1004,24 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
                     </p>
                   ) : null}
 
-                  <button
-                    className="button button-secondary"
-                    disabled={!isConnected || isWorking || !canExecute}
-                    onClick={() => void handleExecute()}
-                  >
-                    Execute current milestone
-                  </button>
-
-                  <button
-                    className="button button-secondary"
-                    disabled={!isConnected || isWorking || !canFailForMissedDeadline}
-                    onClick={() => void handleMissedDeadlineFailure()}
-                  >
-                    Fail for missed deadline
-                  </button>
+                  <div className="button-row">
+                    <button
+                      className="button button-ghost"
+                      disabled={!isConnected || isWorking || !canExecute}
+                      onClick={() => void handleExecute()}
+                      type="button"
+                    >
+                      Execute
+                    </button>
+                    <button
+                      className="button button-ghost"
+                      disabled={!isConnected || isWorking || !canFailForMissedDeadline}
+                      onClick={() => void handleMissedDeadlineFailure()}
+                      type="button"
+                    >
+                      Fail deadline
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -817,6 +1029,17 @@ export function CampaignDetailClient({ campaignId }: CampaignDetailClientProps) 
             {feedback ? <p className="feedback">{feedback}</p> : null}
             {error ? <p className="feedback feedback-error">{error}</p> : null}
             {isRefreshing ? <p className="feedback">Refreshing contract state...</p> : null}
+
+            <div className="sidebar-footer-note">
+              <p className="field-label">Status snapshot</p>
+              <p className="muted-text">
+                This page is connected to chain {chainId}. If wallet and network state change, the
+                campaign view rehydrates from the contract and emitted events.
+              </p>
+              <Link className="inline-link" href="/">
+                Return to campaign directory
+              </Link>
+            </div>
           </article>
         </aside>
       </div>

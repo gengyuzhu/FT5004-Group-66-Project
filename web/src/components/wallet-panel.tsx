@@ -1,83 +1,69 @@
 "use client";
 
-import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
 
 import { chainLabels, defaultChainId } from "@/lib/config";
 import { shortAddress } from "@/lib/utils";
 
-export function WalletPanel() {
+type WalletPanelProps = {
+  campaignCount: number;
+  actionLabel: string;
+  actionHelper: string;
+  onActionClick: () => void;
+};
+
+export function WalletPanel({
+  campaignCount,
+  actionLabel,
+  actionHelper,
+  onActionClick,
+}: WalletPanelProps) {
   const { address, isConnected } = useAccount();
   const activeChainId = useChainId();
   const chainId = activeChainId || defaultChainId;
-  const { connect, connectors, error: connectError, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { switchChain, error: switchError, isPending: isSwitchPending } = useSwitchChain();
 
   return (
     <section className="wallet-panel">
-      <div>
-        <p className="eyebrow">Wallet</p>
-        <h2>Operate directly against the contract.</h2>
+      <div className="wallet-panel-header">
+        <div>
+          <p className="eyebrow">Operator Console</p>
+          <h2>Keep the wallet state visible while the contract stays in control.</h2>
+        </div>
+        <span className={`status-pill ${isConnected ? "status-active" : "status-default"}`}>
+          {isConnected ? "Wallet connected" : "Wallet offline"}
+        </span>
       </div>
 
-      <div className="wallet-summary">
-        <div>
+      <div className="wallet-panel-grid">
+        <article className="wallet-mini-card">
           <span className="field-label">Address</span>
           <strong>{shortAddress(address)}</strong>
-        </div>
-        <div>
+        </article>
+        <article className="wallet-mini-card">
           <span className="field-label">Network</span>
           <strong>{chainLabels[chainId] ?? `Chain ${chainId}`}</strong>
-        </div>
-      </div>
-
-      <div className="network-guide">
-        <article className="network-guide-card">
-          <span className="field-label">Localhost</span>
-          <p className="muted-text">Best for demo speed, local testing, and full-end-to-end rehearsal.</p>
         </article>
-        <article className="network-guide-card">
-          <span className="field-label">Sepolia</span>
-          <p className="muted-text">Best for public verification with a real testnet wallet flow.</p>
+        <article className="wallet-mini-card">
+          <span className="field-label">Campaigns loaded</span>
+          <strong>{campaignCount}</strong>
+        </article>
+        <article className="wallet-mini-card">
+          <span className="field-label">Settlement mode</span>
+          <strong>Escrow + vote</strong>
         </article>
       </div>
 
-      <div className="wallet-actions">
-        {isConnected ? (
-          <button className="button button-secondary" onClick={() => disconnect()}>
-            Disconnect
-          </button>
-        ) : (
-          connectors.map((connector) => (
-            <button
-              key={connector.uid}
-              className="button"
-              disabled={isPending}
-              onClick={() => connect({ connector })}
-            >
-              {isPending ? "Connecting..." : `Connect ${connector.name}`}
-            </button>
-          ))
-        )}
-
-        <button
-          className="button button-secondary"
-          disabled={chainId === 31337 || isSwitchPending}
-          onClick={() => switchChain({ chainId: 31337 })}
-        >
-          Use Localhost
-        </button>
-        <button
-          className="button button-secondary"
-          disabled={chainId === 11155111 || isSwitchPending}
-          onClick={() => switchChain({ chainId: 11155111 })}
-        >
-          Use Sepolia
-        </button>
+      <div className="wallet-panel-story">
+        <p className="muted-text">
+          Create flows pin content to IPFS first, then write only the CID and milestone rules to
+          the chain. Backers interact with the same contract state you see here.
+        </p>
       </div>
 
-      {connectError ? <p className="feedback feedback-error">{connectError.message}</p> : null}
-      {switchError ? <p className="feedback feedback-error">{switchError.message}</p> : null}
+      <button className="button wallet-panel-action" onClick={onActionClick} type="button">
+        {actionLabel}
+      </button>
+      <p className="wallet-panel-helper">{actionHelper}</p>
     </section>
   );
 }

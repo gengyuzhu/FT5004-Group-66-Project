@@ -3,7 +3,9 @@ import Link from "next/link";
 import type { CampaignViewModel } from "@/lib/types";
 import {
   formatEth,
+  formatTimeRemaining,
   formatTimestamp,
+  getCampaignStatusAccent,
   getCampaignStatusLabel,
   getFailureReasonLabel,
   getProgressPercentage,
@@ -15,100 +17,123 @@ type CampaignListProps = {
   isLoading: boolean;
   error: string | null;
   searchTerm: string;
+  statusFilter: string;
   onSearchChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
 };
+
+const filters = ["all", "fundraising", "active", "completed", "failed"];
+
+function getFilterLabel(filter: string) {
+  return filter.charAt(0).toUpperCase() + filter.slice(1);
+}
 
 export function CampaignList({
   campaigns,
   isLoading,
   error,
   searchTerm,
+  statusFilter,
   onSearchChange,
+  onStatusFilterChange,
 }: CampaignListProps) {
   return (
     <section className="campaign-list">
-      <div className="section-heading">
+      <div className="surface-header">
         <div>
-          <p className="eyebrow">Campaign Ledger</p>
-          <h2>Browse the live milestone queue.</h2>
+          <p className="eyebrow">Campaign Directory</p>
+          <h2>Browse live milestone crowdfunding campaigns.</h2>
         </div>
+
         <label className="search-field">
           <span className="field-label">Search</span>
           <input
-            placeholder="Filter by title, creator, or status"
+            placeholder="Search title, creator, campaign id, or status"
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
           />
         </label>
       </div>
 
-      {isLoading ? <p className="feedback">Loading campaign state from the chain...</p> : null}
+      <div className="filter-row">
+        {filters.map((filter) => (
+          <button
+            key={filter}
+            className={`filter-chip ${statusFilter === filter ? "filter-chip-active" : ""}`}
+            onClick={() => onStatusFilterChange(filter)}
+            type="button"
+          >
+            {getFilterLabel(filter)}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? <p className="feedback">Loading campaign state from the selected chain...</p> : null}
       {error ? <p className="feedback feedback-error">{error}</p> : null}
       {!isLoading && !campaigns.length && !error ? (
-        <p className="feedback">
-          No campaigns found on this network yet. Create the first one from the form.
-        </p>
+        <p className="feedback">No campaigns matched the current filters.</p>
       ) : null}
 
       <div className="campaign-grid">
-        {campaigns.map((campaign) => {
-          const progress = getProgressPercentage(
-            campaign.contract.totalRaised,
-            campaign.contract.goal,
-          );
+        {campaigns.map((campaign, index) => {
+          const progress = getProgressPercentage(campaign.contract.totalRaised, campaign.contract.goal);
+          const statusLabel = getCampaignStatusLabel(campaign.contract.status);
 
           return (
-            <article className="campaign-card" key={campaign.id.toString()}>
-              <div className="campaign-card-header">
-                <p className="eyebrow">
-                  Campaign #{campaign.id.toString()} | {getCampaignStatusLabel(campaign.contract.status)}
-                </p>
-                <Link href={`/campaigns/${campaign.id.toString()}`} className="inline-link">
-                  Open detail
-                </Link>
+            <article
+              className="campaign-card campaign-card-dark"
+              key={campaign.id.toString()}
+              style={{ animationDelay: `${index * 60}ms` }}
+            >
+              <div className="campaign-card-topline">
+                <span className={`status-pill ${getCampaignStatusAccent(campaign.contract.status)}`}>
+                  {statusLabel}
+                </span>
+                <span className="mono-note">#{campaign.id.toString()}</span>
               </div>
 
               <h3>{campaign.metadata?.title ?? "Untitled campaign"}</h3>
               <p className="muted-text">
                 {campaign.metadata?.summary ??
-                  "Metadata could not be loaded from IPFS, but the on-chain campaign is still live."}
+                  "Metadata could not be resolved from IPFS, but the on-chain campaign remains accessible."}
               </p>
 
-              <div className="campaign-stats">
-                <div>
-                  <span className="field-label">Raised</span>
-                  <strong>{formatEth(campaign.contract.totalRaised)}</strong>
-                </div>
-                <div>
-                  <span className="field-label">Goal</span>
-                  <strong>{formatEth(campaign.contract.goal)}</strong>
-                </div>
-                <div>
-                  <span className="field-label">Deadline</span>
-                  <strong>{formatTimestamp(campaign.contract.fundraisingDeadline)}</strong>
-                </div>
+              <div className="campaign-progress-copy">
+                <strong>{formatEth(campaign.contract.totalRaised, 2)}</strong>
+                <span>of {formatEth(campaign.contract.goal, 2)}</span>
               </div>
 
-              <div className="progress-track" aria-hidden="true">
+              <div className="progress-track progress-track-dark" aria-hidden="true">
                 <span style={{ width: `${progress}%` }} />
               </div>
 
-              <div className="campaign-footer">
+              <div className="campaign-meta-grid">
                 <div>
                   <span className="field-label">Creator</span>
                   <strong>{shortAddress(campaign.contract.creator)}</strong>
                 </div>
                 <div>
-                  <span className="field-label">Current milestone</span>
+                  <span className="field-label">Current step</span>
                   <strong>
                     {Number(campaign.contract.currentMilestone) + 1} /{" "}
                     {Number(campaign.contract.milestoneCount)}
                   </strong>
                 </div>
                 <div>
+                  <span className="field-label">Funding window</span>
+                  <strong>{formatTimeRemaining(campaign.contract.fundraisingDeadline)}</strong>
+                </div>
+                <div>
                   <span className="field-label">Failure rule</span>
                   <strong>{getFailureReasonLabel(campaign.contract.failureReason)}</strong>
                 </div>
+              </div>
+
+              <div className="campaign-card-footer">
+                <span className="mono-note">{formatTimestamp(campaign.contract.fundraisingDeadline)}</span>
+                <Link className="inline-link" href={`/campaigns/${campaign.id.toString()}`}>
+                  Open campaign
+                </Link>
               </div>
             </article>
           );

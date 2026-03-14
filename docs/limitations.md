@@ -7,3 +7,4 @@
 - No dispute arbitration, identity layer, or delegation features are included.
 - The frontend relies on direct RPC reads and event queries rather than a dedicated indexing layer.
 - The contract is deliberately non-upgradeable to keep the course-project surface smaller and easier to test.
+- The GitHub Pages showcase is a static interaction demo; the live wallet and contract flows still run in `web/`.

@@ -1,49 +1,21 @@
 "use client";
 
-import Link from "next/link";
 import { useDeferredValue, useEffect, useState, useTransition } from "react";
 import { useChainId, usePublicClient } from "wagmi";
 
+import { AppTopbar } from "@/components/app-topbar";
 import { CampaignCreateForm } from "@/components/campaign-create-form";
 import { CampaignList } from "@/components/campaign-list";
 import { WalletPanel } from "@/components/wallet-panel";
 import { defaultChainId } from "@/lib/config";
 import { fetchCampaigns, hasMilestoneVaultDeployment } from "@/lib/milestone-vault";
 import type { CampaignViewModel } from "@/lib/types";
-import { formatEth } from "@/lib/utils";
+import { formatEth, getCampaignStatusLabel } from "@/lib/utils";
 
-const productPillars = [
-  {
-    title: "Escrow first",
-    copy: "Funds remain contract-controlled until a rule-driven transition approves payout or opens refunds.",
-  },
-  {
-    title: "Evidence anchored",
-    copy: "Metadata and proof packages live on IPFS, while the chain stores only the CID needed for verification.",
-  },
-  {
-    title: "Backer adjudication",
-    copy: "Milestone settlement depends on contribution-weighted voting instead of platform-side payout discretion.",
-  },
-];
-
-const executionSteps = [
-  {
-    title: "Create",
-    copy: "Draft campaign metadata, goal, milestone amounts, and due dates before calling createCampaign().",
-  },
-  {
-    title: "Fund",
-    copy: "Backers contribute until the fundraising deadline, then anyone can finalize the fundraising result.",
-  },
-  {
-    title: "Prove + vote",
-    copy: "The creator submits proof, backers vote on the active milestone, and the contract locks the result.",
-  },
-  {
-    title: "Settle",
-    copy: "Approved tranches become withdrawable; failed paths unlock refunds from unreleased escrow only.",
-  },
+const browseHighlights = [
+  "Campaign funds stay escrowed inside the contract until milestone execution passes.",
+  "Creators submit proof to IPFS while the contract stores only the content identifier.",
+  "Backers approve or reject each active milestone with contribution-weighted voting power.",
 ];
 
 export function DashboardShell() {
@@ -54,6 +26,8 @@ export function DashboardShell() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [surface, setSurface] = useState<"browse" | "create">("browse");
   const deferredSearch = useDeferredValue(searchTerm);
   const [refreshToken, setRefreshToken] = useState(0);
   const [isRefreshing, startTransition] = useTransition();
@@ -84,9 +58,7 @@ export function DashboardShell() {
         }
       } catch (loadError) {
         if (!ignore) {
-          setError(
-            loadError instanceof Error ? loadError.message : "Unable to load campaign data.",
-          );
+          setError(loadError instanceof Error ? loadError.message : "Unable to load campaign data.");
         }
       } finally {
         if (!ignore) {
@@ -102,173 +74,152 @@ export function DashboardShell() {
     };
   }, [chainId, publicClient, refreshToken]);
 
-  const normalizedSearch = deferredSearch.trim().toLowerCase();
-  const filteredCampaigns = !normalizedSearch
-    ? campaigns
-    : campaigns.filter((campaign) => {
-        const haystack = [
-          campaign.metadata?.title,
-          campaign.metadata?.summary,
-          campaign.contract.creator,
-          String(campaign.id),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        return haystack.includes(normalizedSearch);
-      });
-
   function refreshCampaigns() {
     startTransition(() => {
       setRefreshToken((value) => value + 1);
     });
   }
 
+  const normalizedSearch = deferredSearch.trim().toLowerCase();
+  const filteredCampaigns = campaigns.filter((campaign) => {
+    const matchesSearch =
+      normalizedSearch.length === 0 ||
+      [
+        campaign.metadata?.title,
+        campaign.metadata?.summary,
+        campaign.contract.creator,
+        String(campaign.id),
+        getCampaignStatusLabel(campaign.contract.status),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch);
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      getCampaignStatusLabel(campaign.contract.status).toLowerCase() === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   const totalRaised = campaigns.reduce((sum, campaign) => sum + campaign.contract.totalRaised, 0n);
   const activeCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 2).length;
+  const fundraisingCampaigns = campaigns.filter((campaign) => Number(campaign.contract.status) === 0).length;
 
   return (
     <main className="dashboard-shell">
-      <section className="app-chrome">
-        <div className="brand-lockup">
-          <p className="eyebrow">FT5004 DApp MVP</p>
-          <strong>MilestoneVault</strong>
-          <span>Decentralized milestone crowdfunding and phased ETH payouts.</span>
-        </div>
+      <AppTopbar activeView={surface} onViewChange={setSurface} />
 
-        <div className="chrome-actions">
-          <a
-            className="inline-link"
-            href="https://gengyuzhu.github.io/FT5004-Group-66-Project/"
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open GitHub Pages demo
-          </a>
-          <a
-            className="inline-link"
-            href="https://github.com/gengyuzhu/FT5004-Group-66-Project/blob/main/docs/uml.md"
-            rel="noreferrer"
-            target="_blank"
-          >
-            UML diagrams
-          </a>
-          <Link className="inline-link" href="/">
-            Refresh dashboard
-          </Link>
-        </div>
-      </section>
-
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">MilestoneVault</p>
-          <h1>From crowdfunding trust gap to milestone-enforced capital flow.</h1>
+      <section className="dashboard-hero-card">
+        <div className="dashboard-hero-copy">
+          <p className="eyebrow">Crowdfunding execution surface</p>
+          <h1>Ship campaigns with escrow, milestone voting, and refund logic in one flow.</h1>
           <p className="hero-text">
-            Create campaigns, lock funds in escrow, publish milestone evidence to IPFS, and let
-            backers decide when capital moves. The platform can guide the flow, but the contract
-            settles it.
+            This interface keeps the contract state legible for creators and backers without hiding
+            the actual trust boundary. Browse live campaigns, inspect their current milestone, or
+            launch a new one from the same surface.
           </p>
 
-          <div className="hero-actions">
-            <a
-              className="button"
-              href="https://gengyuzhu.github.io/FT5004-Group-66-Project/"
-              rel="noreferrer"
-              target="_blank"
-            >
-              View GitHub demo
-            </a>
-            <a
-              className="button button-secondary"
-              href="https://github.com/gengyuzhu/FT5004-Group-66-Project"
-              rel="noreferrer"
-              target="_blank"
-            >
-              View repository
-            </a>
+          <div className="hero-inline-stats">
+            <article className="hero-stat-card">
+              <span className="field-label">Campaigns</span>
+              <strong>{campaigns.length}</strong>
+            </article>
+            <article className="hero-stat-card">
+              <span className="field-label">Active</span>
+              <strong>{activeCampaigns}</strong>
+            </article>
+            <article className="hero-stat-card">
+              <span className="field-label">Fundraising</span>
+              <strong>{fundraisingCampaigns}</strong>
+            </article>
+            <article className="hero-stat-card">
+              <span className="field-label">Escrowed</span>
+              <strong>{formatEth(totalRaised, 2)}</strong>
+            </article>
           </div>
         </div>
 
-        <div className="hero-metrics">
-          <div className="metric-card">
-            <span className="field-label">Campaigns</span>
-            <strong>{campaigns.length}</strong>
+        <aside className="hero-right-rail">
+          <div className="rail-card">
+            <span className="field-label">Current network</span>
+            <strong>Chain {chainId}</strong>
+            <p className="muted-text">
+              The dashboard reads contract state directly from the selected chain and refreshes
+              after each confirmed write.
+            </p>
           </div>
-          <div className="metric-card">
-            <span className="field-label">Active</span>
-            <strong>{activeCampaigns}</strong>
+
+          <div className="rail-card">
+            <span className="field-label">How settlement works</span>
+            <ul className="compact-list">
+              {browseHighlights.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
-          <div className="metric-card">
-            <span className="field-label">Escrowed</span>
-            <strong>{formatEth(totalRaised, 2)}</strong>
-          </div>
-          <div className="metric-card">
-            <span className="field-label">Chain</span>
-            <strong>{chainId}</strong>
-          </div>
-        </div>
+        </aside>
       </section>
 
-      <section className="overview-grid">
-        <article className="overview-panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Trust Boundary</p>
-              <h2>Only trust-minimized state and funds stay on-chain.</h2>
-            </div>
-          </div>
+      {surface === "browse" ? (
+        <div className="dashboard-grid dashboard-grid-browse">
+          <section className="main-stage">
+            <CampaignList
+              campaigns={filteredCampaigns}
+              error={error}
+              isLoading={isLoading}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+            />
+          </section>
 
-          <div className="insight-grid">
-            {productPillars.map((pillar) => (
-              <article className="insight-card" key={pillar.title}>
-                <strong>{pillar.title}</strong>
-                <p className="muted-text">{pillar.copy}</p>
-              </article>
-            ))}
-          </div>
-        </article>
-
-        <article className="overview-panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Execution Flow</p>
-              <h2>One loop from launch to settlement.</h2>
-            </div>
-          </div>
-
-          <div className="flow-list">
-            {executionSteps.map((step, index) => (
-              <article className="flow-step" key={step.title}>
-                <span className="step-index">0{index + 1}</span>
-                <div className="step-body">
-                  <strong>{step.title}</strong>
-                  <p className="muted-text">{step.copy}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      <div className="dashboard-grid">
-        <div className="sidebar-stack">
-          <WalletPanel />
-          <CampaignCreateForm
-            chainId={chainId}
-            onCreated={refreshCampaigns}
-            isRefreshing={isRefreshing}
-          />
+          <aside className="sidebar-stack">
+            <WalletPanel
+              actionHelper="Switch into the creator flow without leaving the dashboard."
+              actionLabel="Start a new campaign"
+              campaignCount={campaigns.length}
+              onActionClick={() => setSurface("create")}
+            />
+          </aside>
         </div>
+      ) : (
+        <div className="dashboard-grid dashboard-grid-create">
+          <section className="main-stage">
+            <CampaignCreateForm
+              chainId={chainId}
+              isRefreshing={isRefreshing}
+              onCancel={() => setSurface("browse")}
+              onCreated={() => {
+                refreshCampaigns();
+                setSurface("browse");
+              }}
+            />
+          </section>
 
-        <CampaignList
-          campaigns={filteredCampaigns}
-          error={error}
-          isLoading={isLoading}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-        />
-      </div>
+          <aside className="sidebar-stack">
+            <WalletPanel
+              actionHelper="Return to the campaign directory after reviewing your draft."
+              actionLabel="Back to campaign list"
+              campaignCount={campaigns.length}
+              onActionClick={() => setSurface("browse")}
+            />
+
+            <section className="side-note-card">
+              <p className="eyebrow">Creation checklist</p>
+              <h2>Before you deploy</h2>
+              <ul className="compact-list">
+                <li>Make milestone amounts add up to the exact campaign goal.</li>
+                <li>Keep due dates strictly increasing and later than the fundraising deadline.</li>
+                <li>Prepare cover art, project copy, and milestone evidence paths before publishing.</li>
+                <li>Use localhost first, then Sepolia for public demo verification.</li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      )}
     </main>
   );
 }

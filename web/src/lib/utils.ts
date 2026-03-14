@@ -28,6 +28,12 @@ export function shortAddress(address?: string | null) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+export function formatShortEth(value: bigint, maximumFractionDigits = 2) {
+  return Number(formatEther(value)).toLocaleString(undefined, {
+    maximumFractionDigits,
+  });
+}
+
 export function getCampaignStatusLabel(status: bigint | number) {
   switch (Number(status)) {
     case CampaignStatus.Fundraising:
@@ -40,6 +46,21 @@ export function getCampaignStatusLabel(status: bigint | number) {
       return "Completed";
     default:
       return "Unknown";
+  }
+}
+
+export function getCampaignStatusAccent(status: bigint | number) {
+  switch (Number(status)) {
+    case CampaignStatus.Fundraising:
+      return "status-fundraising";
+    case CampaignStatus.Failed:
+      return "status-failed";
+    case CampaignStatus.Active:
+      return "status-active";
+    case CampaignStatus.Completed:
+      return "status-completed";
+    default:
+      return "status-default";
   }
 }
 
@@ -63,6 +84,33 @@ export function getProgressPercentage(totalRaised: bigint, goal: bigint) {
 
   const value = Number((totalRaised * 10_000n) / goal) / 100;
   return Math.min(value, 100);
+}
+
+export function formatTimeRemaining(value?: bigint | number | string) {
+  if (value === undefined || value === null || value === "") {
+    return "Not set";
+  }
+
+  const targetSeconds = typeof value === "bigint" ? Number(value) : Number(value);
+  const remainingSeconds = targetSeconds - Math.floor(Date.now() / 1000);
+
+  if (remainingSeconds <= 0) {
+    return "Ended";
+  }
+
+  const days = Math.floor(remainingSeconds / 86_400);
+  const hours = Math.floor((remainingSeconds % 86_400) / 3_600);
+
+  if (days > 0) {
+    return `${days}d ${hours}h left`;
+  }
+
+  const minutes = Math.floor((remainingSeconds % 3_600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m left`;
+  }
+
+  return `${Math.max(minutes, 1)}m left`;
 }
 
 export function parseDateTimeInput(value: string) {

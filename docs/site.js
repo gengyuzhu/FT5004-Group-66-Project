@@ -2,11 +2,10 @@ const state = {
   walletConnected: false,
   network: "Localhost",
   filter: "All",
-  selectedCampaignId: 1,
-  votedOnCurrentMilestone: false,
+  selectedCampaignId: 2,
   activity: [
-    "Campaign 1 created with 2 milestones and rule-based refunds.",
-    "Campaign 2 funded and waiting for proof review.",
+    "Preview booted from the repository site.",
+    "Campaign state is now grouped by milestone actions and refund visibility.",
   ],
 };
 
@@ -74,6 +73,21 @@ const walletState = document.getElementById("wallet-state");
 const networkSwitcher = document.getElementById("network-switcher");
 const filterSwitcher = document.getElementById("filter-switcher");
 
+function getStatusClass(status) {
+  switch (status) {
+    case "Fundraising":
+      return "status-fundraising";
+    case "Active":
+      return "status-active";
+    case "Completed":
+      return "status-completed";
+    case "Failed":
+      return "status-failed";
+    default:
+      return "status-default";
+  }
+}
+
 function appendActivity(message) {
   state.activity.unshift(message);
   state.activity = state.activity.slice(0, 8);
@@ -113,17 +127,16 @@ function renderCampaigns() {
       (campaign) => `
         <article class="campaign-card ${campaign.id === state.selectedCampaignId ? "active" : ""}" data-campaign-id="${campaign.id}">
           <div class="campaign-head">
-            <div>
-              <p class="eyebrow">Campaign #${campaign.id}</p>
-              <h3>${campaign.title}</h3>
-            </div>
-            <span class="status-pill">${campaign.status}</span>
+            <span class="status-pill ${getStatusClass(campaign.status)}">${campaign.status}</span>
+            <span class="meta-note">#${campaign.id}</span>
           </div>
+          <h3>${campaign.title}</h3>
           <p>${campaign.summary}</p>
           <div class="quick-facts">
-            <span class="meta-label">Raised ${campaign.raised} ETH</span>
-            <span class="meta-label">Goal ${campaign.goal} ETH</span>
-            <span class="meta-label">Creator ${campaign.creator}</span>
+            <div><span class="meta-label">Raised</span><span class="meta-value">${campaign.raised} ETH</span></div>
+            <div><span class="meta-label">Goal</span><span class="meta-value">${campaign.goal} ETH</span></div>
+            <div><span class="meta-label">Creator</span><span class="meta-value">${campaign.creator}</span></div>
+            <div><span class="meta-label">Milestones</span><span class="meta-value">${campaign.milestones.length}</span></div>
           </div>
           <div class="progress"><span style="width:${progress(campaign)}%"></span></div>
         </article>
@@ -135,35 +148,38 @@ function renderCampaigns() {
 function renderDetail() {
   const campaign = selectedCampaign();
   const currentMilestone =
-    campaign.milestones[Math.min(campaign.currentMilestone, campaign.milestones.length - 1)];
+    campaign.milestones[Math.min(campaign.currentMilestone, campaign.milestones.length - 1)] ?? null;
 
   detailTitle.textContent = campaign.title;
   detailStatus.textContent = campaign.status;
+  detailStatus.className = `status-pill ${getStatusClass(campaign.status)}`;
 
   detailSummary.innerHTML = `
-    <div class="section-title">
+    <div class="section-header">
       <div>
-        <p class="eyebrow">Campaign Overview</p>
+        <p class="eyebrow">Campaign overview</p>
         <h3>${campaign.summary}</h3>
       </div>
+      <span class="status-pill ${getStatusClass(campaign.status)}">${campaign.status}</span>
     </div>
-    <div class="summary-matrix">
+    <div class="summary-grid">
       <div><span class="meta-label">Creator</span><span class="meta-value">${campaign.creator}</span></div>
       <div><span class="meta-label">Escrowed</span><span class="meta-value">${campaign.raised} ETH / ${campaign.goal} ETH</span></div>
       <div><span class="meta-label">Refund pool</span><span class="meta-value">${campaign.refundPool} ETH</span></div>
       <div><span class="meta-label">Current milestone</span><span class="meta-value">${Math.min(campaign.currentMilestone + 1, campaign.milestones.length)} / ${campaign.milestones.length}</span></div>
     </div>
+    <div class="progress"><span style="width:${progress(campaign)}%"></span></div>
   `;
 
   milestoneList.innerHTML = campaign.milestones
     .map((milestone, index) => {
       const badge = milestone.executed
-        ? "Approved"
+        ? ["Approved", "status-completed"]
         : milestone.proof
-          ? "Voting"
+          ? ["Voting open", "status-active"]
           : index === campaign.currentMilestone
-            ? "Current"
-            : "Queued";
+            ? ["Current", "status-fundraising"]
+            : ["Queued", "status-default"];
 
       return `
         <article class="milestone-item">
@@ -172,13 +188,13 @@ function renderDetail() {
               <p class="eyebrow">Milestone ${index + 1}</p>
               <h4>${milestone.title}</h4>
             </div>
-            <span class="status-pill">${badge}</span>
+            <span class="status-pill ${badge[1]}">${badge[0]}</span>
           </div>
           <div class="milestone-meta">
             <div><span class="meta-label">Amount</span><span class="meta-value">${milestone.amount} ETH</span></div>
             <div><span class="meta-label">Due</span><span class="meta-value">${milestone.due}</span></div>
-            <div><span class="meta-label">Yes</span><span class="meta-value">${milestone.yes} ETH</span></div>
-            <div><span class="meta-label">No</span><span class="meta-value">${milestone.no} ETH</span></div>
+            <div><span class="meta-label">YES</span><span class="meta-value">${milestone.yes} ETH</span></div>
+            <div><span class="meta-label">NO</span><span class="meta-value">${milestone.no} ETH</span></div>
           </div>
         </article>
       `;
@@ -191,14 +207,14 @@ function renderDetail() {
 }
 
 function renderActions(campaign, currentMilestone) {
-  const actions = [];
+  const cards = [];
 
   if (campaign.status === "Fundraising") {
-    actions.push(`
+    cards.push(`
       <div class="action-box">
-        <p class="eyebrow">Funding Controls</p>
-        <h4>Contribute or finalize</h4>
+        <p class="eyebrow">Fundraising controls</p>
         <strong>${campaign.raised.toFixed(1)} ETH raised</strong>
+        <p>Backers can still contribute. Finalization moves the campaign into milestone execution.</p>
         <div class="action-buttons">
           <button class="button" data-action="contribute">Add 0.5 ETH</button>
           <button class="button button-secondary" data-action="finalize">Finalize</button>
@@ -208,25 +224,25 @@ function renderActions(campaign, currentMilestone) {
   }
 
   if (campaign.status === "Active" && currentMilestone && !currentMilestone.proof) {
-    actions.push(`
+    cards.push(`
       <div class="action-box">
-        <p class="eyebrow">Proof Controls</p>
-        <h4>Open milestone voting</h4>
+        <p class="eyebrow">Proof controls</p>
         <strong>${currentMilestone.title}</strong>
+        <p>The creator can submit proof and open the weighted vote window for this milestone.</p>
         <div class="action-buttons">
-          <button class="button" data-action="submit-proof">Submit Proof</button>
-          <button class="button button-secondary" data-action="miss-deadline">Missed Deadline</button>
+          <button class="button" data-action="submit-proof">Submit proof</button>
+          <button class="button button-ghost" data-action="miss-deadline">Missed deadline</button>
         </div>
       </div>
     `);
   }
 
   if (campaign.status === "Active" && currentMilestone && currentMilestone.proof && !currentMilestone.executed) {
-    actions.push(`
+    cards.push(`
       <div class="action-box">
-        <p class="eyebrow">Vote Controls</p>
-        <h4>Cast a simulated backer vote</h4>
+        <p class="eyebrow">Voting controls</p>
         <strong>${currentMilestone.yes} YES / ${currentMilestone.no} NO</strong>
+        <p>Contribution-weighted votes decide whether this tranche becomes creator-withdrawable.</p>
         <div class="action-buttons">
           <button class="button" data-action="vote-yes">Vote YES</button>
           <button class="button button-secondary" data-action="vote-no">Vote NO</button>
@@ -236,31 +252,30 @@ function renderActions(campaign, currentMilestone) {
     `);
   }
 
-  if (campaign.status === "Completed") {
-    actions.push(`
-      <div class="action-box">
-        <p class="eyebrow">Payout Complete</p>
-        <h4>Creator can withdraw all approved tranches</h4>
-        <strong>Final state reached</strong>
-        <p>All milestones passed, so the campaign is ready for the final creator pull-payment.</p>
-      </div>
-    `);
-  }
-
   if (campaign.status === "Failed") {
-    actions.push(`
+    cards.push(`
       <div class="action-box">
-        <p class="eyebrow">Refund Flow</p>
-        <h4>Backers reclaim unreleased escrow</h4>
+        <p class="eyebrow">Refund flow</p>
         <strong>${campaign.refundPool.toFixed(1)} ETH refundable</strong>
+        <p>Backers reclaim only unreleased escrow. Approved payouts stay outside the refund pool.</p>
         <div class="action-buttons">
-          <button class="button" data-action="claim-refund">Claim Refund</button>
+          <button class="button" data-action="claim-refund">Claim refund</button>
         </div>
       </div>
     `);
   }
 
-  actionStack.innerHTML = actions.join("");
+  if (campaign.status === "Completed") {
+    cards.push(`
+      <div class="action-box">
+        <p class="eyebrow">Completed state</p>
+        <strong>All milestones passed</strong>
+        <p>The creator can finish withdrawing approved tranches while the campaign remains publicly auditable.</p>
+      </div>
+    `);
+  }
+
+  actionStack.innerHTML = cards.join("");
 }
 
 function renderActivity() {
@@ -269,7 +284,7 @@ function renderActivity() {
       (item) => `
         <article class="activity-item">
           <strong>${item}</strong>
-          <p>Interactive demo state updated locally in GitHub Pages.</p>
+          <p>Static interaction updated locally inside the GitHub Pages showcase.</p>
         </article>
       `,
     )
@@ -278,18 +293,18 @@ function renderActivity() {
 
 function renderPhone(campaign, currentMilestone) {
   phoneScreen.innerHTML = `
-    <div class="phone-card">
-      <p class="eyebrow">Mobile Dashboard</p>
+    <div class="mini-card">
+      <span class="eyebrow">Campaign</span>
       <strong>${campaign.title}</strong>
       <p>${campaign.status} | ${campaign.raised}/${campaign.goal} ETH</p>
     </div>
-    <div class="phone-card">
-      <p class="eyebrow">Current milestone</p>
+    <div class="mini-card">
+      <span class="eyebrow">Current milestone</span>
       <strong>${currentMilestone ? currentMilestone.title : "Completed"}</strong>
       <p>${currentMilestone ? `${currentMilestone.yes} YES / ${currentMilestone.no} NO` : "No pending vote"}</p>
     </div>
-    <div class="phone-card">
-      <p class="eyebrow">Wallet state</p>
+    <div class="mini-card">
+      <span class="eyebrow">Wallet</span>
       <strong>${state.walletConnected ? "Connected" : "Offline"}</strong>
       <p>${state.network}</p>
     </div>
@@ -323,14 +338,12 @@ function handleAction(action) {
     case "vote-yes":
       if (currentMilestone) {
         currentMilestone.yes = Number((currentMilestone.yes + 1.5).toFixed(1));
-        state.votedOnCurrentMilestone = true;
         appendActivity(`A backer cast a YES vote on milestone ${campaign.currentMilestone + 1}.`);
       }
       break;
     case "vote-no":
       if (currentMilestone) {
-        currentMilestone.no = Number((currentMilestone.no + 1.0).toFixed(1));
-        state.votedOnCurrentMilestone = true;
+        currentMilestone.no = Number((currentMilestone.no + 1).toFixed(1));
         appendActivity(`A backer cast a NO vote on milestone ${campaign.currentMilestone + 1}.`);
       }
       break;
@@ -353,7 +366,7 @@ function handleAction(action) {
       break;
     case "miss-deadline":
       campaign.status = "Failed";
-      appendActivity(`Campaign ${campaign.id} failed because the proof deadline was missed.`);
+      appendActivity(`Campaign ${campaign.id} failed after the active milestone deadline was missed.`);
       break;
     case "claim-refund":
       appendActivity(`Backer claimed a proportional refund from campaign ${campaign.id}.`);
@@ -366,10 +379,10 @@ function handleAction(action) {
 }
 
 function render() {
-  walletState.textContent = state.walletConnected
-    ? `Wallet connected | ${state.network}`
-    : "Wallet offline";
+  walletState.textContent = state.walletConnected ? `Wallet connected on ${state.network}` : "Wallet offline";
+  walletState.className = `status-pill ${state.walletConnected ? "status-active" : "status-default"}`;
   walletToggle.textContent = state.walletConnected ? "Disconnect Wallet" : "Connect Wallet";
+
   renderSwitchers();
   renderCampaigns();
   renderDetail();
@@ -378,7 +391,7 @@ function render() {
 walletToggle.addEventListener("click", () => {
   state.walletConnected = !state.walletConnected;
   appendActivity(
-    state.walletConnected ? "Mock wallet connected in the GitHub demo." : "Mock wallet disconnected.",
+    state.walletConnected ? "Mock wallet connected in the repository preview." : "Mock wallet disconnected.",
   );
   render();
 });
@@ -398,7 +411,7 @@ document.addEventListener("click", (event) => {
 
   if (target.dataset.network) {
     state.network = target.dataset.network;
-    appendActivity(`Switched preview network to ${state.network}.`);
+    appendActivity(`Preview network switched to ${state.network}.`);
     render();
     return;
   }

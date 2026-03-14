@@ -129,6 +129,32 @@ describe("MilestoneVault", function () {
       ).to.be.revertedWith("Milestone amounts must sum to goal");
     });
 
+    it("rejects a missing metadata CID", async function () {
+      const { vault, creator } = await loadFixture(deployVaultFixture);
+      const now = await time.latest();
+
+      await expect(
+        vault
+          .connect(creator)
+          .createCampaign(
+            ethers.parseEther("10"),
+            now + 7 * DAY,
+            [ethers.parseEther("10")],
+            [now + 10 * DAY],
+            "",
+          ),
+      ).to.be.revertedWith("Metadata CID is required");
+    });
+
+    it("rejects campaigns without milestones", async function () {
+      const { vault, creator } = await loadFixture(deployVaultFixture);
+      const now = await time.latest();
+
+      await expect(
+        vault.connect(creator).createCampaign(ethers.parseEther("10"), now + 7 * DAY, [], [], "bafy"),
+      ).to.be.revertedWith("At least one milestone is required");
+    });
+
     it("rejects milestone due dates that are not strictly increasing", async function () {
       const { vault, creator } = await loadFixture(deployVaultFixture);
       const now = await time.latest();
@@ -336,6 +362,15 @@ describe("MilestoneVault", function () {
       await expect(
         vault.connect(creator).submitMilestoneProof(nextCampaignId, 0, "bafy-late-proof"),
       ).to.be.revertedWith("Milestone due date passed");
+    });
+
+    it("rejects an empty proof CID", async function () {
+      const { vault, creator, alice, bob } = await loadFixture(deployVaultFixture);
+      const campaign = await fundAndActivateCampaign(vault, creator, alice, bob);
+
+      await expect(
+        vault.connect(creator).submitMilestoneProof(campaign.campaignId, 0, ""),
+      ).to.be.revertedWith("Proof CID is required");
     });
   });
 
@@ -641,6 +676,35 @@ describe("MilestoneVault", function () {
       await expect(vault.connect(alice).claimRefund(campaign.campaignId))
         .to.emit(vault, "RefundClaimed")
         .withArgs(campaign.campaignId, alice.address, ethers.parseEther("4"));
+    });
+  });
+
+  describe("failCampaignForMissedDeadline", function () {
+    it("rejects failure before the active milestone due date", async function () {
+      const { vault, creator, alice, bob, outsider } = await loadFixture(deployVaultFixture);
+      const campaign = await fundAndActivateCampaign(vault, creator, alice, bob, {
+        milestoneAmounts: [ethers.parseEther("10")],
+        milestoneDueDates: [(await time.latest()) + 15 * DAY],
+      });
+
+      await expect(
+        vault.connect(outsider).failCampaignForMissedDeadline(campaign.campaignId),
+      ).to.be.revertedWith("Milestone deadline not missed");
+    });
+
+    it("rejects failure if proof was already submitted for the active milestone", async function () {
+      const { vault, creator, alice, bob, outsider } = await loadFixture(deployVaultFixture);
+      const campaign = await fundAndActivateCampaign(vault, creator, alice, bob, {
+        milestoneAmounts: [ethers.parseEther("10")],
+        milestoneDueDates: [(await time.latest()) + 15 * DAY],
+      });
+
+      await vault.connect(creator).submitMilestoneProof(campaign.campaignId, 0, "bafy-proof");
+      await time.increaseTo(campaign.milestoneDueDates[0] + 1);
+
+      await expect(
+        vault.connect(outsider).failCampaignForMissedDeadline(campaign.campaignId),
+      ).to.be.revertedWith("Proof already submitted");
     });
   });
 
